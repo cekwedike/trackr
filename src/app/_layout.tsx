@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -129,16 +130,18 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AppProvider>
-          <ThemeProvider value={navTheme}>
-            <StatusBar style="light" />
-            <ConfirmProvider>
-              <AppGate />
-            </ConfirmProvider>
-          </ThemeProvider>
-        </AppProvider>
-      </SafeAreaProvider>
+      <KeyboardProvider>
+        <SafeAreaProvider>
+          <AppProvider>
+            <ThemeProvider value={navTheme}>
+              <StatusBar style="light" />
+              <ConfirmProvider>
+                <AppGate />
+              </ConfirmProvider>
+            </ThemeProvider>
+          </AppProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }
