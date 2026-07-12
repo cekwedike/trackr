@@ -1,0 +1,126 @@
+import { getDb } from '@/db/client';
+import type { Order, OrderItem, OrderStatus } from '@/db/types';
+import { nowIso } from '@/lib/date';
+
+export interface OrderItemInput {
+  product_id: number | null;
+  name: string;
+  qty: number;
+  unit_price: number;
+}
+
+export interface OrderInput {
+  customer_id: number | null;
+  customer_name: string | null;
+  status: OrderStatus;
+  due_at: string | null;
+  amount_paid: number;
+  note?: string | null;
+  items: OrderItemInput[];
+}
+
+export const ORDER_STATUSES: { value: OrderStatus; label: string }[] = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'ready', label: 'Ready' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+export async function listOrders(): Promise<Order[]> {
+  const db = await getDb();
+  return db.getAllAsync<Order>('SELECT * FROM orders ORDER BY created_at DESC');
+}
+
+export async function getOrder(id: number): Promise<Order | null> {
+  const db = await getDb();
+  return db.getFirstAsync<Order>('SELECT * FROM orders WHERE id = ?', [id]);
+}
+
+export async function getOrderItems(orderId: number): Promise<OrderItem[]> {
+  const db = await getDb();
+  return db.getAllAsync<OrderItem>('SELECT * FROM order_items WHERE order_id = ? ORDER BY id ASC', [orderId]);
+}
+
+function computeTotal(items: OrderItemInput[]): number {
+  return items.reduce((sum, it) => sum + Math.round(it.unit_price * it.qty), 0);
+}
+
+export async function createOrder(input: OrderInput): Promise<number> {
+  const db = await getDb();
+  const now = nowIso();
+  const total = computeTotal(input.items);
+  let orderId = 0;
+  await db.withTransactionAsync(async () => {
+    const res = await db.runAsync(
+      `INSERT INTO orders (customer_id, customer_name, status, due_at, total, amount_paid, note, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.customer_id,
+        input.customer_name,
+        input.status,
+        input.due_at,
+        total,
+        input.amount_paid,
+        input.note ?? null,
+        now,
+        now,
+      ],
+    );
+    orderId = res.lastInsertRowId;
+    for (const it of input.items) {
+      await db.runAsync(
+        'INSERT INTO order_items (order_id, product_id, name, qty, unit_price, line_total) VALUES (?, ?, ?, ?, ?, ?)',
+        [orderId, it.product_id, it.name, it.qty, it.unit_price, Math.round(it.unit_price * it.qty)],
+      );
+    }
+  });
+  return orderId;
+}
+
+export async function updateOrder(id: number, input: OrderInput): Promise<void> {
+  const db = await getDb();
+  const now = nowIso();
+  const total = computeTotal(input.items);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE orders SET customer_id = ?, customer_name = ?, status = ?, due_at = ?, total = ?, amount_paid = ?, note = ?, updated_at = ? WHERE id = ?`,
+      [
+        input.customer_id,
+        input.customer_name,
+        input.status,
+        input.due_at,
+        total,
+        input.amount_paid,
+        input.note ?? null,
+        now,
+        id,
+      ],
+    );
+    await db.runAsync('DELETE FROM order_items WHERE order_id = ?', [id]);
+    for (const it of input.items) {
+      await db.runAsync(
+        'INSERT INTO order_items (order_id, product_id, name, qty, unit_price, line_total) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, it.product_id, it.name, it.qty, it.unit_price, Math.round(it.unit_price * it.qty)],
+      );
+    }
+  });
+}
+
+export async function setOrderStatus(id: number, status: OrderStatus): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [status, nowIso(), id]);
+}
+
+export async function deleteOrder(id: number): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM orders WHERE id = ?', [id]);
+}
+
+export async function countActiveOrders(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ c: number }>(
+    "SELECT COUNT(*) AS c FROM orders WHERE status NOT IN ('delivered','cancelled')",
+  );
+  return row?.c ?? 0;
+}
