@@ -5,7 +5,9 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   LayoutChangeEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -194,22 +196,31 @@ export function Screen({
   const { width } = useWindowDimensions();
   const hPad = padded ? (width >= 480 ? Spacing.xl : Spacing.lg) : 0;
   const centered: ViewStyle = { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' };
-  if (scroll) {
-    return (
-      <SafeAreaView edges={['top']} style={[{ flex: 1, backgroundColor: t.background }, style]}>
-        <ScrollView
-          contentContainerStyle={[{ paddingBottom: Spacing.xxxl * 2, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, contentStyle]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={centered}>{children}</View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+  const body = scroll ? (
+    <ScrollView
+      contentContainerStyle={[{ paddingBottom: Spacing.xxxl * 2, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, contentStyle]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={centered}>{children}</View>
+    </ScrollView>
+  ) : (
+    <View style={[{ flex: 1, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, centered]}>{children}</View>
+  );
+  // Keyboard avoidance is handled centrally so every form/input screen stays
+  // usable when the on-screen keyboard is up. Per the Expo SDK 57 keyboard
+  // handling guide, iOS uses `behavior="padding"`; Android leaves `behavior`
+  // undefined and relies on `softwareKeyboardLayoutMode: 'resize'` (the default
+  // — see app.json) plus the RN 0.86 edge-to-edge KeyboardAvoidingView fixes.
+  // `keyboardVerticalOffset` stays 0 because there is no native header
+  // (headerShown: false), so the KeyboardAvoidingView already spans from the
+  // safe-area top to the screen bottom.
   return (
     <SafeAreaView edges={['top']} style={[{ flex: 1, backgroundColor: t.background }, style]}>
-      <View style={[{ flex: 1, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, centered]}>{children}</View>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {body}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

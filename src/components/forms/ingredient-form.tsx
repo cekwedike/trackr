@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { SelectField, SelectModal } from '@/components/pickers';
 import { Spacing } from '@/constants/theme';
@@ -15,6 +16,7 @@ const UNITS = ['g', 'kg', 'ml', 'litre', 'pcs', 'pack', 'cup', 'tbsp', 'tsp', 'b
 
 export function IngredientForm({ initial }: { initial?: Ingredient }) {
   const t = useTheme();
+  const confirm = useConfirm();
   const { currencySymbol } = useApp();
 
   const [name, setName] = useState(initial?.name ?? '');
@@ -59,12 +61,20 @@ export function IngredientForm({ initial }: { initial?: Ingredient }) {
     }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!initial) return;
-    Alert.alert('Delete ingredient', 'Remove this ingredient?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteIngredient(initial.id); router.back(); } },
-    ]);
+    const choice = await confirm({
+      title: 'Delete ingredient',
+      message: 'Remove this ingredient?',
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice === 'delete') {
+      await deleteIngredient(initial.id);
+      router.back();
+    }
   };
 
   return (

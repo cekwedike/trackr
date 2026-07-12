@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { Button, Card, IconButton, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
@@ -27,6 +28,7 @@ const nextKey = () => `o-${counter++}`;
 
 export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () => void }) {
   const t = useTheme();
+  const confirm = useConfirm();
   const { money, currencySymbol, terms } = useApp();
 
   const [customerId, setCustomerId] = useState<number | null>(initial?.customer_id ?? null);
@@ -87,12 +89,21 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
     }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!initial) return;
-    Alert.alert(`Delete ${terms.order.toLowerCase()}`, `Remove this ${terms.order.toLowerCase()}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteOrder(initial.id); router.back(); } },
-    ]);
+    const label = terms.order.toLowerCase();
+    const choice = await confirm({
+      title: `Delete ${label}`,
+      message: `Remove this ${label}?`,
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice === 'delete') {
+      await deleteOrder(initial.id);
+      router.back();
+    }
   };
 
   return (

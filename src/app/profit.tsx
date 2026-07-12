@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
 import { AllocationDonut, DONUT_COLORS, FadeSlide, Stagger } from '@/components/anim';
+import { useConfirm } from '@/components/confirm';
 import { HelpTip } from '@/components/help';
 import {
   AppHeader,
@@ -57,6 +58,7 @@ function toDraft(buckets: { name: string; percent: number }[]): DraftBucket[] {
 
 export default function ProfitScreen() {
   const t = useTheme();
+  const confirm = useConfirm();
   const { settings, money, reloadSettings, industry, accent } = useApp();
   const [monthKey, setMonthKey] = useState<string>(currentMonthKey());
   const [editing, setEditing] = useState(false);
@@ -120,18 +122,19 @@ export default function ProfitScreen() {
     });
   };
 
-  const loadIndustryDefault = () => {
-    Alert.alert(
-      `Use ${industry.name} template?`,
-      'This replaces the buckets below with the recommended split. Nothing is saved until you record the month.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Use template',
-          onPress: () => setDraft(toDraft(getIndustry(settings?.industry).defaultAllocation.map((b) => ({ ...b })))),
-        },
+  const loadIndustryDefault = async () => {
+    const choice = await confirm({
+      title: `Use ${industry.name} template?`,
+      message:
+        'This replaces the buckets below with the recommended split. Nothing is saved until you record the month.',
+      actions: [
+        { label: 'Use template', value: 'use' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
       ],
-    );
+    });
+    if (choice === 'use') {
+      setDraft(toDraft(getIndustry(settings?.industry).defaultAllocation.map((b) => ({ ...b }))));
+    }
   };
 
   const copyPreviousMonth = async () => {

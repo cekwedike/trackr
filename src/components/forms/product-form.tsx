@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { SelectField, SelectModal } from '@/components/pickers';
@@ -18,6 +19,7 @@ const UNITS = ['pcs', 'pack', 'box', 'kg', 'g', 'litre', 'ml', 'plate', 'bottle'
 
 export function ProductForm({ initial }: { initial?: Product }) {
   const t = useTheme();
+  const confirm = useConfirm();
   const { currencySymbol, money } = useApp();
 
   const [name, setName] = useState(initial?.name ?? '');
@@ -73,12 +75,20 @@ export function ProductForm({ initial }: { initial?: Product }) {
     }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!initial) return;
-    Alert.alert('Delete product', 'Remove this product?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteProduct(initial.id); router.back(); } },
-    ]);
+    const choice = await confirm({
+      title: 'Delete product',
+      message: 'Remove this product?',
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice === 'delete') {
+      await deleteProduct(initial.id);
+      router.back();
+    }
   };
 
   const margin = parseMoney(price) - parseMoney(cost);

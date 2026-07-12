@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { ENTITY_ROUTE, entityMeta } from '@/components/notes/entities';
 import { useNoteColorTokens } from '@/components/notes/palette';
@@ -27,6 +28,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 export default function NoteEditor() {
   const t = useTheme();
+  const confirm = useConfirm();
   const { id } = useLocalSearchParams<{ id: string }>();
   const noteId = Number(id);
 
@@ -73,11 +75,19 @@ export default function NoteEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, body, pinned, color]);
 
-  const remove = () => {
-    Alert.alert('Delete note', 'This note will be permanently deleted.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteNote(noteId); router.back(); } },
-    ]);
+  const remove = async () => {
+    const choice = await confirm({
+      title: 'Delete note',
+      message: 'This note will be permanently deleted.',
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice === 'delete') {
+      await deleteNote(noteId);
+      router.back();
+    }
   };
 
   const chooseType = async (type: string) => {

@@ -1,21 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Duration, Ease } from '@/constants/motion';
 
 import { Aurora, FadeSlide } from '@/components/anim';
 import { AnimatedGrid } from '@/components/nav';
-import { Brand, Button, Card, Screen, Text, TextField, Toggle } from '@/components/ui';
+import { Brand, Button, Card, Text, TextField, Toggle } from '@/components/ui';
 import { CURRENCIES } from '@/constants/currencies';
 import { getIndustry, INDUSTRIES } from '@/constants/industries';
-import { FontWeight, Radius, Spacing } from '@/constants/theme';
+import { FontWeight, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { updateSettings } from '@/db/repos/settings';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,6 +27,9 @@ import { PermissionRationale, requestNotifications, type PermissionOutcome } fro
 
 export default function Onboarding() {
   const t = useTheme();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const hPad = width >= 480 ? Spacing.xl : Spacing.lg;
   const { reloadSettings, unlock } = useApp();
   const [step, setStep] = useState(0);
 
@@ -88,243 +92,281 @@ export default function Onboarding() {
   );
 
   return (
-    <Screen scroll>
-      <View style={{ overflow: 'hidden', borderRadius: Radius.xl, marginTop: Spacing.xl, marginBottom: Spacing.lg }}>
-        <Aurora colors={[t.primary, t.accent, t.info]} opacity={0.4} />
-        <View style={{ alignItems: 'center', paddingVertical: Spacing.xl }}>
-          <Brand size={76} showWordmark subtitle="Your business, in your pocket" />
-        </View>
-      </View>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: t.background }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={{ flex: 1, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', paddingHorizontal: hPad }}>
+          {/* Fixed header: brand + progress stay visible while step content scrolls */}
+          <View style={{ overflow: 'hidden', borderRadius: Radius.xl, marginTop: Spacing.md, marginBottom: Spacing.lg }}>
+            <Aurora colors={[t.primary, t.accent, t.info]} opacity={0.4} />
+            <View style={{ alignItems: 'center', paddingVertical: Spacing.lg }}>
+              <Brand size={64} showWordmark subtitle="Your business, in your pocket" />
+            </View>
+          </View>
 
-      <StepProgress step={step} total={5} />
+          <StepProgress step={step} total={5} />
 
-      {step === 0 ? (
-        <FadeSlide key="s0">
-        <Card style={{ gap: Spacing.lg }}>
-          <Text variant="subtitle">Let&apos;s set up your business</Text>
-          <Text variant="body" color={t.textSecondary}>
-            Track sales, expenses, inventory, orders and profit — all in one place, right on your phone.
-          </Text>
-          <TextField label="Business name" value={name} onChangeText={setName} placeholder="e.g. Thrive Bakery" autoFocus />
-          <Button title="Continue" icon="arrow-forward" onPress={() => setStep(1)} />
-        </Card>
-        </FadeSlide>
-      ) : null}
+          {/* Scrollable step content: fills the space between the header and the pinned footer */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: Spacing.lg }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {step === 0 ? (
+              <FadeSlide key="s0">
+                <Card style={{ gap: Spacing.lg }}>
+                  <Text variant="subtitle">Let&apos;s set up your business</Text>
+                  <Text variant="body" color={t.textSecondary}>
+                    Track sales, expenses, inventory, orders and profit — all in one place, right on your phone.
+                  </Text>
+                  <TextField label="Business name" value={name} onChangeText={setName} placeholder="e.g. Thrive Bakery" autoFocus />
+                </Card>
+              </FadeSlide>
+            ) : null}
 
-      {step === 1 ? (
-        <FadeSlide key="s1">
-        <Card style={{ gap: Spacing.md }}>
-          <Text variant="subtitle">What do you do?</Text>
-          <Text variant="body" color={t.textSecondary}>
-            Pick the closest fit — this tailors your dashboard, terminology and profit template. You can change it anytime.
-          </Text>
-          <TextField value={industryQuery} onChangeText={setIndustryQuery} placeholder="Search industries" />
-          {filteredIndustries.length === 0 ? (
-            <Text variant="caption" color={t.textSecondary}>No match. Try another word or pick “General”.</Text>
-          ) : (
-            <AnimatedGrid
-              data={filteredIndustries}
-              columns={2}
-              keyExtractor={(ind) => ind.id}
-              renderItem={(ind) => {
-                const active = ind.id === industryId;
-                return (
-                  <Pressable
-                    onPress={() => setIndustryId(ind.id)}
+            {step === 1 ? (
+              <FadeSlide key="s1">
+                <Card style={{ gap: Spacing.md }}>
+                  <Text variant="subtitle">What do you do?</Text>
+                  <Text variant="body" color={t.textSecondary}>
+                    Pick the closest fit — this tailors your dashboard, terminology and profit template. You can change it anytime.
+                  </Text>
+                  <TextField value={industryQuery} onChangeText={setIndustryQuery} placeholder="Search industries" />
+                  {filteredIndustries.length === 0 ? (
+                    <Text variant="caption" color={t.textSecondary}>No match. Try another word or pick “General”.</Text>
+                  ) : (
+                    <AnimatedGrid
+                      data={filteredIndustries}
+                      columns={2}
+                      keyExtractor={(ind) => ind.id}
+                      renderItem={(ind) => {
+                        const active = ind.id === industryId;
+                        return (
+                          <Pressable
+                            onPress={() => setIndustryId(ind.id)}
+                            style={{
+                              padding: Spacing.md,
+                              borderRadius: Radius.md,
+                              borderWidth: 1.5,
+                              borderColor: active ? ind.accent : t.border,
+                              backgroundColor: active ? hexToRgba(ind.accent, 0.1) : t.card,
+                              gap: Spacing.xs,
+                            }}
+                          >
+                            <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: hexToRgba(ind.accent, 0.16), alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons name={ind.icon} size={20} color={ind.accent} />
+                            </View>
+                            <Text variant="body" weight="semibold" numberOfLines={1}>{ind.name}</Text>
+                            <Text variant="caption" color={t.textSecondary} numberOfLines={1}>{ind.tagline}</Text>
+                          </Pressable>
+                        );
+                      }}
+                    />
+                  )}
+                </Card>
+              </FadeSlide>
+            ) : null}
+
+            {step === 2 ? (
+              <FadeSlide key="s2">
+                <Card style={{ gap: Spacing.md }}>
+                  <Text variant="subtitle">Choose your currency</Text>
+                  <View style={{ gap: Spacing.sm }}>
+                    {CURRENCIES.map((c) => {
+                      const active = c.code === currency;
+                      return (
+                        <Pressable
+                          key={c.code}
+                          onPress={() => setCurrency(c.code)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: Spacing.md,
+                            borderRadius: Radius.md,
+                            borderWidth: 1,
+                            borderColor: active ? t.primary : t.border,
+                            backgroundColor: active ? t.primarySoft : t.card,
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                            <Text variant="subtitle" color={active ? t.primary : t.text} style={{ width: 44 }}>{c.symbol}</Text>
+                            <View>
+                              <Text variant="body" weight="semibold">{c.code}</Text>
+                              <Text variant="caption" color={t.textSecondary}>{c.name}</Text>
+                            </View>
+                          </View>
+                          {active ? <Ionicons name="checkmark-circle" size={22} color={t.primary} /> : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </Card>
+              </FadeSlide>
+            ) : null}
+
+            {step === 3 ? (
+              <FadeSlide key="s3n">
+                <Card style={{ gap: Spacing.lg }}>
+                  <Text variant="subtitle">{PermissionRationale.notifications.title}</Text>
+                  <Text variant="body" color={t.textSecondary}>
+                    {PermissionRationale.notifications.message}
+                  </Text>
+
+                  <View
                     style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: Spacing.md,
+                      padding: Spacing.md,
+                      borderRadius: Radius.md,
+                      backgroundColor: t.primarySoft,
+                    }}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: hexToRgba(t.primary, 0.16), alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="notifications" size={22} color={t.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text variant="body" weight="semibold">Reminders</Text>
+                      <Text variant="caption" color={t.textSecondary}>Payments, restocks and follow-ups — never miss one.</Text>
+                    </View>
+                    {notifOutcome === 'granted' ? <Ionicons name="checkmark-circle" size={24} color={t.success} /> : null}
+                  </View>
+
+                  {notifOutcome === 'granted' ? (
+                    <Text variant="caption" color={t.success}>Notifications enabled. You&apos;re all set.</Text>
+                  ) : notifOutcome === 'denied' ? (
+                    <Text variant="caption" color={t.textSecondary}>
+                      No problem — you can turn reminders on anytime from Settings.
+                    </Text>
+                  ) : null}
+
+                  {notifOutcome !== 'granted' ? (
+                    <Button
+                      title={notifOutcome === 'denied' ? 'Try again' : 'Enable reminders'}
+                      icon="notifications-outline"
+                      onPress={enableNotifications}
+                      loading={requestingNotif}
+                    />
+                  ) : null}
+                </Card>
+              </FadeSlide>
+            ) : null}
+
+            {step === 4 ? (
+              <FadeSlide key="s4">
+                <Card style={{ gap: Spacing.lg }}>
+                  <Text variant="subtitle">Secure your data</Text>
+                  <Text variant="body" color={t.textSecondary}>
+                    Lock Trackr with a PIN so only you can open your books. You can change this later in Settings.
+                  </Text>
+
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                       padding: Spacing.md,
                       borderRadius: Radius.md,
                       borderWidth: 1.5,
-                      borderColor: active ? ind.accent : t.border,
-                      backgroundColor: active ? hexToRgba(ind.accent, 0.1) : t.card,
-                      gap: Spacing.xs,
+                      borderColor: enableLock ? t.primary : t.border,
                     }}
                   >
-                    <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: hexToRgba(ind.accent, 0.16), alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name={ind.icon} size={20} color={ind.accent} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                      <Ionicons name="lock-closed" size={20} color={enableLock ? t.primary : t.textSecondary} />
+                      <Text variant="body" weight="semibold">Enable app lock</Text>
                     </View>
-                    <Text variant="body" weight="semibold" numberOfLines={1}>{ind.name}</Text>
-                    <Text variant="caption" color={t.textSecondary} numberOfLines={1}>{ind.tagline}</Text>
-                  </Pressable>
-                );
-              }}
-            />
-          )}
-          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-            <Button title="Back" variant="ghost" onPress={() => setStep(0)} style={{ flex: 1 }} />
-            <Button title="Continue" icon="arrow-forward" onPress={() => setStep(2)} style={{ flex: 1 }} />
-          </View>
-        </Card>
-        </FadeSlide>
-      ) : null}
-
-      {step === 2 ? (
-        <FadeSlide key="s2">
-        <Card style={{ gap: Spacing.md }}>
-          <Text variant="subtitle">Choose your currency</Text>
-          <View style={{ gap: Spacing.sm }}>
-            {CURRENCIES.map((c) => {
-              const active = c.code === currency;
-              return (
-                <Pressable
-                  key={c.code}
-                  onPress={() => setCurrency(c.code)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: Spacing.md,
-                    borderRadius: Radius.md,
-                    borderWidth: 1,
-                    borderColor: active ? t.primary : t.border,
-                    backgroundColor: active ? t.primarySoft : t.card,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
-                    <Text variant="subtitle" color={active ? t.primary : t.text} style={{ width: 44 }}>{c.symbol}</Text>
-                    <View>
-                      <Text variant="body" weight="semibold">{c.code}</Text>
-                      <Text variant="caption" color={t.textSecondary}>{c.name}</Text>
-                    </View>
+                    <Toggle value={enableLock} onValueChange={setEnableLock} />
                   </View>
-                  {active ? <Ionicons name="checkmark-circle" size={22} color={t.primary} /> : null}
-                </Pressable>
-              );
-            })}
-          </View>
-          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-            <Button title="Back" variant="ghost" onPress={() => setStep(1)} style={{ flex: 1 }} />
-            <Button title="Continue" icon="arrow-forward" onPress={() => setStep(3)} style={{ flex: 1 }} />
-          </View>
-        </Card>
-        </FadeSlide>
-      ) : null}
 
-      {step === 3 ? (
-        <FadeSlide key="s3n">
-        <Card style={{ gap: Spacing.lg }}>
-          <Text variant="subtitle">{PermissionRationale.notifications.title}</Text>
-          <Text variant="body" color={t.textSecondary}>
-            {PermissionRationale.notifications.message}
-          </Text>
+                  {enableLock ? (
+                    <View style={{ gap: Spacing.md }}>
+                      <TextField
+                        label="PIN (4-6 digits)"
+                        value={pin}
+                        onChangeText={setPinValue}
+                        keyboardType="number-pad"
+                        secureTextEntry
+                        maxLength={6}
+                        placeholder="••••"
+                      />
+                      <TextField
+                        label="Confirm PIN"
+                        value={confirmPin}
+                        onChangeText={setConfirmPin}
+                        keyboardType="number-pad"
+                        secureTextEntry
+                        maxLength={6}
+                        placeholder="••••"
+                      />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                          <Ionicons name="finger-print" size={20} color={t.textSecondary} />
+                          <Text variant="body">Use fingerprint / face unlock</Text>
+                        </View>
+                        <Toggle value={biometric} onValueChange={setBiometric} />
+                      </View>
+                    </View>
+                  ) : null}
+                </Card>
+              </FadeSlide>
+            ) : null}
+          </ScrollView>
 
+          {/* Sticky footer: the primary action is always visible without scrolling */}
           <View
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: Spacing.md,
-              padding: Spacing.md,
-              borderRadius: Radius.md,
-              backgroundColor: t.primarySoft,
+              paddingTop: Spacing.md,
+              paddingBottom: insets.bottom + Spacing.md,
+              gap: Spacing.sm,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: t.border,
+              backgroundColor: t.background,
             }}
           >
-            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: hexToRgba(t.primary, 0.16), alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="notifications" size={22} color={t.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text variant="body" weight="semibold">Reminders</Text>
-              <Text variant="caption" color={t.textSecondary}>Payments, restocks and follow-ups — never miss one.</Text>
-            </View>
-            {notifOutcome === 'granted' ? <Ionicons name="checkmark-circle" size={24} color={t.success} /> : null}
-          </View>
+            {step === 4 && error ? <Text variant="caption" color={t.danger}>{error}</Text> : null}
 
-          {notifOutcome === 'granted' ? (
-            <Text variant="caption" color={t.success}>Notifications enabled. You&apos;re all set.</Text>
-          ) : notifOutcome === 'denied' ? (
-            <Text variant="caption" color={t.textSecondary}>
-              No problem — you can turn reminders on anytime from Settings.
-            </Text>
-          ) : null}
+            {step === 0 ? (
+              <Button title="Continue" icon="arrow-forward" onPress={() => setStep(1)} />
+            ) : null}
 
-          {notifOutcome !== 'granted' ? (
-            <Button
-              title={notifOutcome === 'denied' ? 'Try again' : 'Enable reminders'}
-              icon="notifications-outline"
-              onPress={enableNotifications}
-              loading={requestingNotif}
-            />
-          ) : null}
-
-          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-            <Button title="Back" variant="ghost" onPress={() => setStep(2)} style={{ flex: 1 }} />
-            <Button
-              title={notifOutcome === 'granted' ? 'Continue' : 'Skip for now'}
-              icon="arrow-forward"
-              variant={notifOutcome === 'granted' ? 'primary' : 'secondary'}
-              onPress={() => setStep(4)}
-              style={{ flex: 1 }}
-            />
-          </View>
-        </Card>
-        </FadeSlide>
-      ) : null}
-
-      {step === 4 ? (
-        <FadeSlide key="s4">
-        <Card style={{ gap: Spacing.lg }}>
-          <Text variant="subtitle">Secure your data</Text>
-          <Text variant="body" color={t.textSecondary}>
-            Lock Trackr with a PIN so only you can open your books. You can change this later in Settings.
-          </Text>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: Spacing.md,
-              borderRadius: Radius.md,
-              borderWidth: 1.5,
-              borderColor: enableLock ? t.primary : t.border,
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
-              <Ionicons name="lock-closed" size={20} color={enableLock ? t.primary : t.textSecondary} />
-              <Text variant="body" weight="semibold">Enable app lock</Text>
-            </View>
-            <Toggle value={enableLock} onValueChange={setEnableLock} />
-          </View>
-
-          {enableLock ? (
-            <View style={{ gap: Spacing.md }}>
-              <TextField
-                label="PIN (4-6 digits)"
-                value={pin}
-                onChangeText={setPinValue}
-                keyboardType="number-pad"
-                secureTextEntry
-                maxLength={6}
-                placeholder="••••"
-              />
-              <TextField
-                label="Confirm PIN"
-                value={confirmPin}
-                onChangeText={setConfirmPin}
-                keyboardType="number-pad"
-                secureTextEntry
-                maxLength={6}
-                placeholder="••••"
-              />
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
-                  <Ionicons name="finger-print" size={20} color={t.textSecondary} />
-                  <Text variant="body">Use fingerprint / face unlock</Text>
-                </View>
-                <Toggle value={biometric} onValueChange={setBiometric} />
+            {step === 1 ? (
+              <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                <Button title="Back" variant="ghost" onPress={() => setStep(0)} style={{ flex: 1 }} />
+                <Button title="Continue" icon="arrow-forward" onPress={() => setStep(2)} style={{ flex: 1 }} />
               </View>
-            </View>
-          ) : null}
+            ) : null}
 
-          {error ? <Text variant="caption" color={t.danger}>{error}</Text> : null}
+            {step === 2 ? (
+              <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                <Button title="Back" variant="ghost" onPress={() => setStep(1)} style={{ flex: 1 }} />
+                <Button title="Continue" icon="arrow-forward" onPress={() => setStep(3)} style={{ flex: 1 }} />
+              </View>
+            ) : null}
 
-          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-            <Button title="Back" variant="ghost" onPress={() => setStep(3)} style={{ flex: 1 }} />
-            <Button title="Finish" icon="checkmark" onPress={finish} loading={saving} style={{ flex: 1 }} />
+            {step === 3 ? (
+              <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                <Button title="Back" variant="ghost" onPress={() => setStep(2)} style={{ flex: 1 }} />
+                <Button
+                  title={notifOutcome === 'granted' ? 'Continue' : 'Skip for now'}
+                  icon="arrow-forward"
+                  variant={notifOutcome === 'granted' ? 'primary' : 'secondary'}
+                  onPress={() => setStep(4)}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            ) : null}
+
+            {step === 4 ? (
+              <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+                <Button title="Back" variant="ghost" onPress={() => setStep(3)} style={{ flex: 1 }} />
+                <Button title="Finish" icon="checkmark" onPress={finish} loading={saving} style={{ flex: 1 }} />
+              </View>
+            ) : null}
           </View>
-        </Card>
-        </FadeSlide>
-      ) : null}
-    </Screen>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

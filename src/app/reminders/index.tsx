@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { AppHeader, Card, Chip, EmptyState, FAB, IconButton, Screen, Text } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { deleteReminder, getReminder, listReminders, setReminderCompleted } from '@/db/repos/reminders';
@@ -14,6 +15,7 @@ const RECUR_LABEL: Record<string, string> = { none: 'Once', daily: 'Daily', week
 
 export default function RemindersScreen() {
   const t = useTheme();
+  const confirm = useConfirm();
   const { data, reload } = useAsyncData(() => listReminders(true), []);
 
   const complete = async (id: number, done: boolean) => {
@@ -25,20 +27,20 @@ export default function RemindersScreen() {
     reload();
   };
 
-  const remove = (id: number) => {
-    Alert.alert('Delete reminder', 'Remove this reminder?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const r = await getReminder(id);
-          await cancelReminder(r?.notification_id);
-          await deleteReminder(id);
-          reload();
-        },
-      },
-    ]);
+  const remove = async (id: number) => {
+    const choice = await confirm({
+      title: 'Delete reminder',
+      message: 'Remove this reminder?',
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice !== 'delete') return;
+    const r = await getReminder(id);
+    await cancelReminder(r?.notification_id);
+    await deleteReminder(id);
+    reload();
   };
 
   const active = (data ?? []).filter((r) => r.completed === 0);

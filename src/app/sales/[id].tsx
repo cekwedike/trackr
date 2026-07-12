@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { AppHeader, Button, Card, Chip, DetailHero, Divider, IconButton, InfoRow, Screen, SectionHeader, Text } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
@@ -15,6 +16,7 @@ import { printReceipt, saleToReceipt, shareReceipt } from '@/lib/receipt';
 
 export default function SaleDetail() {
   const t = useTheme();
+  const confirm = useConfirm();
   const { money, settings, accent, currencySymbol } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const saleId = Number(id);
@@ -28,18 +30,19 @@ export default function SaleDetail() {
     return { sale, items, customer };
   }, [saleId]);
 
-  const remove = () => {
-    Alert.alert('Delete sale', 'This will permanently remove this sale record.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteSale(saleId);
-          router.back();
-        },
-      },
-    ]);
+  const remove = async () => {
+    const choice = await confirm({
+      title: 'Delete sale',
+      message: 'This will permanently remove this sale record.',
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice === 'delete') {
+      await deleteSale(saleId);
+      router.back();
+    }
   };
 
   if (!data?.sale) {

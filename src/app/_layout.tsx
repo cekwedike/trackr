@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Image } from 'expo-image';
 
+import { ConfirmProvider } from '@/components/confirm';
 import { Button, Text } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppProvider, useApp } from '@/context/app-context';
@@ -132,7 +133,9 @@ export default function RootLayout() {
         <AppProvider>
           <ThemeProvider value={navTheme}>
             <StatusBar style="light" />
-            <AppGate />
+            <ConfirmProvider>
+              <AppGate />
+            </ConfirmProvider>
           </ThemeProvider>
         </AppProvider>
       </SafeAreaProvider>

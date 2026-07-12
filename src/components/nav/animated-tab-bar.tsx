@@ -71,9 +71,9 @@ function TabItem({
   }, [focused, reduced, progress]);
 
   const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + progress.value * 0.14 }, { translateY: progress.value * -2 }],
+    transform: [{ scale: 1 + progress.value * 0.12 }, { translateY: progress.value * -1 }],
   }));
-  const labelStyle = useAnimatedStyle(() => ({ opacity: 0.6 + progress.value * 0.4 }));
+  const labelStyle = useAnimatedStyle(() => ({ opacity: 0.55 + progress.value * 0.45 }));
 
   return (
     <Pressable
@@ -102,8 +102,9 @@ function TabItem({
 }
 
 /**
- * Custom animated bottom tab bar: a spring-driven moving pill behind the active
- * tab, icon scale/bounce on focus, animated labels and a press ripple.
+ * Custom animated bottom tab bar: a slim, spring-driven accent underline that
+ * slides across the top edge to mark the active tab, plus an accent-tinted icon
+ * with a subtle lift/scale on focus, animated labels and a press ripple.
  *
  * Per-industry tab gating happens HERE: expo-router does not remove `href: null`
  * routes from `state.routes` when a custom `tabBar` is supplied, so all registered
@@ -124,10 +125,12 @@ export function AnimatedTabBar({ state, descriptors, navigation, insets }: Anima
 
   const count = routes.length;
   const itemW = count > 0 ? rowW / count : 0;
-  const pillW = itemW > 0 ? Math.max(44, Math.min(64, itemW - Spacing.md)) : 0;
+  // A short, confident underline — sized to the item but capped so it reads as a
+  // deliberate marker rather than a full-width block.
+  const barW = itemW > 0 ? Math.max(24, Math.min(32, itemW * 0.4)) : 0;
 
   // `state.index` indexes the FULL routes array; map the focused route into the
-  // filtered list. -1 means the active route is hidden (e.g. `notes`) → no pill.
+  // filtered list. -1 means the active route is hidden (e.g. `notes`) → no marker.
   const focusedRoute = state.routes[state.index];
   const focusedIndex = focusedRoute ? routes.findIndex((r) => r.key === focusedRoute.key) : -1;
 
@@ -140,10 +143,10 @@ export function AnimatedTabBar({ state, descriptors, navigation, insets }: Anima
       : withSpring(focusedIndex, Spring.snappy);
   }, [focusedIndex, reduced, pos]);
 
-  const showPill = focusedIndex >= 0;
-  const pillStyle = useAnimatedStyle(() => ({
+  const showIndicator = focusedIndex >= 0;
+  const indicatorStyle = useAnimatedStyle(() => ({
     width: itemW,
-    opacity: itemW > 0 && showPill ? 1 : 0,
+    opacity: itemW > 0 && showIndicator ? 1 : 0,
     transform: [{ translateX: pos.value * itemW }],
   }));
 
@@ -163,16 +166,20 @@ export function AnimatedTabBar({ state, descriptors, navigation, insets }: Anima
       }}
     >
       <View onLayout={onRowLayout} style={{ flexDirection: 'row', height: 52 }}>
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { flexDirection: 'row' }]}>
-          <Animated.View style={[{ height: '100%', alignItems: 'center', justifyContent: 'center' }, pillStyle]}>
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { top: -Spacing.sm, flexDirection: 'row' }]}
+        >
+          <Animated.View style={[{ alignItems: 'center', justifyContent: 'flex-start' }, indicatorStyle]}>
             <View
               style={{
-                width: pillW,
-                height: 40,
+                width: barW,
+                height: 3,
                 borderRadius: Radius.pill,
-                backgroundColor: hexToRgba(accent, 0.14),
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: hexToRgba(accent, 0.22),
+                backgroundColor: accent,
+                ...(Platform.OS === 'ios'
+                  ? { shadowColor: accent, shadowOpacity: 0.5, shadowRadius: 6, shadowOffset: { width: 0, height: 1 } }
+                  : null),
               }}
             />
           </Animated.View>

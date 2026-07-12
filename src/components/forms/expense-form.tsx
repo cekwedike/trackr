@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { Button, Card, Screen, AppHeader, TextField } from '@/components/ui';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
 import { Spacing } from '@/constants/theme';
@@ -14,6 +15,7 @@ const PAYMENT = ['Cash', 'Transfer', 'POS', 'Card', 'Other'];
 
 export function ExpenseForm({ initial }: { initial?: Expense }) {
   const { currencySymbol } = useApp();
+  const confirm = useConfirm();
   const [amount, setAmount] = useState(initial ? String(fromMinor(initial.amount)) : '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [category, setCategory] = useState(initial?.category ?? '');
@@ -46,12 +48,20 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
     }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!initial) return;
-    Alert.alert('Delete expense', 'Remove this expense?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteExpense(initial.id); router.back(); } },
-    ]);
+    const choice = await confirm({
+      title: 'Delete expense',
+      message: 'Remove this expense?',
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice === 'delete') {
+      await deleteExpense(initial.id);
+      router.back();
+    }
   };
 
   return (

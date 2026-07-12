@@ -1,8 +1,8 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
+import React, { useEffect, useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Button, IconButton, Text, type IconName } from '@/components/ui';
 import { INDUSTRIES } from '@/constants/industries';
@@ -53,6 +53,38 @@ export function SelectModal({
   const { accent, industry } = useApp();
   const [query, setQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+
+  // Entrance animation is driven by shared values + `useAnimatedStyle` (a
+  // translateY transform + opacity), NOT by reanimated `entering` layout
+  // animations. On Android, layout `entering` animations (e.g. `SlideInDown`)
+  // leave nested touchables' hit-test regions offset from where they render
+  // until a re-layout is forced — which made the close (×) button, option rows
+  // and the search clear button silently ignore taps here (tapping the plain
+  // backdrop still worked, and typing a search query forced a re-layout that
+  // "fixed" it). Transform-based animation keeps the native layout fixed, so
+  // every nested Pressable receives touches immediately. See the base `Sheet`
+  // in nav/sheet.tsx which uses the same pattern.
+  // Refs: reanimated issues #7723 / #6676, react-native #51621.
+  const translateY = useSharedValue(48);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      opacity.value = withTiming(1, { duration: 180 });
+      translateY.value = withSpring(0, { damping: 20, stiffness: 180 });
+    } else {
+      // Reset so the next open animates in from the bottom again.
+      opacity.value = 0;
+      translateY.value = 48;
+    }
+  }, [visible, opacity, translateY]);
+
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const sheetStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
   const filtered = useMemo(() => {
     if (!query.trim()) return options;
     const q = query.toLowerCase();
@@ -72,17 +104,25 @@ export function SelectModal({
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: t.overlay }}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <Animated.View style={[{ flex: 1, backgroundColor: t.overlay }, backdropStyle]}>
         <Pressable style={{ flex: 1 }} onPress={onClose} />
       </Animated.View>
+      {/* Lift the sheet above the keyboard so the search field / footer stay
+          reachable. The KeyboardAvoidingView fills the screen (so the sheet's
+          `maxHeight: '82%'` still resolves) and pins the sheet to the bottom via
+          `justifyContent: 'flex-end'`. `pointerEvents="box-none"` keeps taps on
+          the empty area falling through to the backdrop's close Pressable.
+          Behavior follows the Expo SDK 57 guide: `padding` on iOS, undefined on
+          Android (relies on `softwareKeyboardLayoutMode: 'resize'`). The sheet's
+          transform-based entrance animation stays on the inner Animated.View. */}
+      <KeyboardAvoidingView
+        style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end' }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        pointerEvents="box-none"
+      >
       <Animated.View
-        entering={SlideInDown.springify().damping(20).stiffness(180)}
-        style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
+        style={[{
           maxHeight: '82%',
           backgroundColor: t.card,
           borderTopLeftRadius: Radius.xl,
@@ -96,7 +136,7 @@ export function SelectModal({
           paddingBottom: Spacing.xl,
           gap: Spacing.md,
           ...Shadow.lg,
-        }}
+        }, sheetStyle]}
       >
         <View style={{ alignItems: 'center', paddingBottom: Spacing.xs }}>
           <View
@@ -304,6 +344,7 @@ export function SelectModal({
           </>
         ) : null}
       </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { DateTimeField } from '@/components/pickers';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import { fromMinor, parseMoney } from '@/lib/money';
 
 export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?: () => void }) {
   const t = useTheme();
+  const confirm = useConfirm();
   const { currencySymbol, terms } = useApp();
   const [name, setName] = useState(initial?.name ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
@@ -50,12 +52,21 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
     }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!initial) return;
-    Alert.alert(`Delete ${terms.customer.toLowerCase()}`, `Remove this ${terms.customer.toLowerCase()}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteCustomer(initial.id); router.back(); } },
-    ]);
+    const label = terms.customer.toLowerCase();
+    const choice = await confirm({
+      title: `Delete ${label}`,
+      message: `Remove this ${label}?`,
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice === 'delete') {
+      await deleteCustomer(initial.id);
+      router.back();
+    }
   };
 
   return (

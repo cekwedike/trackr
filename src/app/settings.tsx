@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, View } from 'react-native';
 
 import { FadeSlide } from '@/components/anim';
+import { useConfirm } from '@/components/confirm';
 import { AppHeader, Button, Card, Divider, ListRow, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { SelectField, SelectModal } from '@/components/pickers';
 import { CURRENCIES, findCurrency } from '@/constants/currencies';
@@ -16,6 +17,7 @@ import { exportBackup, importBackup } from '@/lib/backup';
 
 export default function Settings() {
   const t = useTheme();
+  const confirm = useConfirm();
   const { settings, reloadSettings, industry, setIndustry } = useApp();
   const [name, setName] = useState('');
   const [currencyModal, setCurrencyModal] = useState(false);
@@ -44,31 +46,46 @@ export default function Settings() {
     setIndustryModal(false);
     if (!settings || id === settings.industry) return;
     const target = getIndustry(id);
-    Alert.alert(
-      `Switch to ${target.name}?`,
-      'Your dashboard and labels will re-theme. Keep your current profit split, or replace it with this industry’s template?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Keep my split', onPress: async () => { await setIndustry(id, false); await reloadSettings(); } },
-        { text: 'Use template', onPress: async () => { await setIndustry(id, true); await reloadSettings(); } },
-      ],
-    );
+    // Defer so the picker's native Modal fully dismisses before the confirm
+    // dialog's Modal mounts — two RN Modals presenting on the same frame race
+    // on Android (the same class of bug the picker's `if (!visible)` guard
+    // guards against).
+    setTimeout(async () => {
+      const choice = await confirm({
+        title: `Switch to ${target.name}?`,
+        message:
+          'Your dashboard and labels will re-theme. Keep your current profit split, or replace it with this industry’s template?',
+        actions: [
+          { label: 'Keep my split', value: 'keep' },
+          { label: 'Use template', value: 'template' },
+          { label: 'Cancel', style: 'cancel', value: 'cancel' },
+        ],
+      });
+      if (choice === 'keep') {
+        await setIndustry(id, false);
+        await reloadSettings();
+      } else if (choice === 'template') {
+        await setIndustry(id, true);
+        await reloadSettings();
+      }
+    }, 220);
   };
 
   const toggleLock = async () => {
     if (settings.lock_enabled === 1) {
-      Alert.alert('Turn off app lock', 'Trackr will open without a PIN. Continue?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Turn off',
-          style: 'destructive',
-          onPress: async () => {
-            await clearPin();
-            await updateSettings({ lock_enabled: 0, biometric_enabled: 0 });
-            await reloadSettings();
-          },
-        },
-      ]);
+      const choice = await confirm({
+        title: 'Turn off app lock',
+        message: 'Trackr will open without a PIN. Continue?',
+        actions: [
+          { label: 'Turn off', style: 'destructive', value: 'off' },
+          { label: 'Cancel', style: 'cancel', value: 'cancel' },
+        ],
+      });
+      if (choice === 'off') {
+        await clearPin();
+        await updateSettings({ lock_enabled: 0, biometric_enabled: 0 });
+        await reloadSettings();
+      }
     } else {
       setPinModal(true);
     }
@@ -107,27 +124,27 @@ export default function Settings() {
   };
 
   const doImport = async () => {
-    Alert.alert('Restore backup', 'This will REPLACE all current data with the backup file. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Restore',
-        style: 'destructive',
-        onPress: async () => {
-          setBusy(true);
-          try {
-            const res = await importBackup();
-            if (res.imported) {
-              await reloadSettings();
-              Alert.alert('Restored', 'Your data has been restored.');
-            }
-          } catch (e) {
-            Alert.alert('Import failed', String(e));
-          } finally {
-            setBusy(false);
-          }
-        },
-      },
-    ]);
+    const choice = await confirm({
+      title: 'Restore backup',
+      message: 'This will REPLACE all current data with the backup file. Continue?',
+      actions: [
+        { label: 'Restore', style: 'destructive', value: 'restore' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice !== 'restore') return;
+    setBusy(true);
+    try {
+      const res = await importBackup();
+      if (res.imported) {
+        await reloadSettings();
+        Alert.alert('Restored', 'Your data has been restored.');
+      }
+    } catch (e) {
+      Alert.alert('Import failed', String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { FadeSlide } from '@/components/anim';
+import { useConfirm } from '@/components/confirm';
 import { Card, IconButton, ListRow, Text } from '@/components/ui';
 import { Duration, Ease } from '@/constants/motion';
 import { Radius, Spacing } from '@/constants/theme';
@@ -27,6 +28,7 @@ import { dismissChecklist, isChecklistDismissed, loadOnboardingProgress } from '
  */
 export function GettingStarted() {
   const t = useTheme();
+  const confirm = useConfirm();
   const { industry, settings, accent } = useApp();
   const [hidden, setHidden] = useState(false);
 
@@ -42,24 +44,21 @@ export function GettingStarted() {
   const { items, doneCount, total, complete } = data.progress;
   const pct = total > 0 ? doneCount / total : 0;
 
-  const hide = () => {
-    Alert.alert(
-      complete ? 'Hide checklist' : 'Hide getting started?',
-      complete
+  const hide = async () => {
+    const choice = await confirm({
+      title: complete ? 'Hide checklist' : 'Hide getting started?',
+      message: complete
         ? 'Nice work! You can still find everything in the Help Center.'
         : 'You can always learn the app from the Help Center in the More tab.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Hide',
-          style: complete ? 'default' : 'destructive',
-          onPress: () => {
-            dismissChecklist();
-            setHidden(true);
-          },
-        },
+      actions: [
+        { label: 'Hide', style: complete ? 'default' : 'destructive', value: 'hide' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
       ],
-    );
+    });
+    if (choice === 'hide') {
+      dismissChecklist();
+      setHidden(true);
+    }
   };
 
   return (

@@ -57,6 +57,7 @@ export default function SearchScreen() {
 
   const runSearch = useCallback(
     async (term: string, reqId: number) => {
+      try {
       const [sales, expenses, customers, orders, notes, products] = await Promise.all([
         modules.sales ? searchSales(term) : Promise.resolve<SaleSearchRow[]>([]),
         searchExpenses(term),
@@ -168,7 +169,13 @@ export default function SearchScreen() {
       }
 
       setGroups(next);
-      setSearching(false);
+      } catch {
+        // A failed query shouldn't strand the UI in a "searching" state (which
+        // previously hid the clear button behind a permanent spinner).
+        if (reqId === latestReq.current) setGroups([]);
+      } finally {
+        if (reqId === latestReq.current) setSearching(false);
+      }
     },
     [modules.sales, modules.customers, modules.orders, modules.inventory, terms],
   );
@@ -225,11 +232,12 @@ export default function SearchScreen() {
         style={{ marginBottom: Spacing.lg }}
         right={
           query.length > 0 ? (
-            searching ? (
-              <ActivityIndicator size="small" color={t.textMuted} />
-            ) : (
+            // Keep the clear (×) button mounted and tappable even while a search
+            // is in flight — show the spinner beside it, never in place of it.
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              {searching ? <ActivityIndicator size="small" color={t.textMuted} /> : null}
               <IconButton icon="close-circle" size={18} color={t.textMuted} onPress={clear} />
-            )
+            </View>
           ) : (
             <Ionicons name="search" size={18} color={t.textMuted} />
           )

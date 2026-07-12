@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { useConfirm } from '@/components/confirm';
 import { Button, Card, IconButton, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { SelectField, SelectModal } from '@/components/pickers';
@@ -26,6 +27,7 @@ const nextKey = () => `r-${counter++}`;
 
 export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () => void }) {
   const t = useTheme();
+  const confirm = useConfirm();
   const { money } = useApp();
 
   const [name, setName] = useState(initial?.name ?? '');
@@ -91,12 +93,20 @@ export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () 
     }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!initial) return;
-    Alert.alert('Delete recipe', 'Remove this recipe?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteRecipe(initial.id); router.back(); } },
-    ]);
+    const choice = await confirm({
+      title: 'Delete recipe',
+      message: 'Remove this recipe?',
+      actions: [
+        { label: 'Delete', style: 'destructive', value: 'delete' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice === 'delete') {
+      await deleteRecipe(initial.id);
+      router.back();
+    }
   };
 
   const linkedProduct = products.find((p) => p.id === productId);
