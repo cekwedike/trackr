@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Text } from '@/components/ui';
-import { Radius, Spacing } from '@/constants/theme';
+import { Brand, Text } from '@/components/ui';
+import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
 import { authenticateBiometric, verifyPin } from '@/lib/auth';
@@ -58,9 +58,7 @@ export default function Lock() {
   return (
     <View style={{ flex: 1, backgroundColor: t.background, justifyContent: 'center', padding: Spacing.xl }}>
       <View style={{ alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.xxl }}>
-        <View style={{ width: 64, height: 64, borderRadius: Radius.xl, backgroundColor: t.primary, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="lock-closed" size={30} color="#FFFFFF" />
-        </View>
+        <Brand size={64} />
         <Text variant="title">{settings?.business_name ?? 'Trackr'}</Text>
         <Text variant="body" color={t.textSecondary}>Enter your PIN to unlock</Text>
       </View>

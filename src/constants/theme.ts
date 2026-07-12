@@ -139,4 +139,30 @@ export const Fonts = Platform.select({
   web: { sans: 'system-ui, sans-serif', rounded: 'system-ui, sans-serif', mono: 'monospace' },
 }) as { sans: string; rounded: string; mono: string };
 
-export const MaxContentWidth = 720;
+export const MaxContentWidth = 640;
+
+/** Soft, layered elevation presets (subtle on Android via elevation, richer on iOS via shadow). */
+export const Shadow = {
+  none: {},
+  sm: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  md: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  lg: {
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+} as const;

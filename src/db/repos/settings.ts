@@ -28,6 +28,7 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
     'currency_code',
     'currency_symbol',
     'locale',
+    'industry',
     'profit_allocation',
     'lock_enabled',
     'biometric_enabled',

@@ -73,7 +73,7 @@ export default function More() {
       </Card>
 
       <Text variant="caption" color={t.textMuted} style={{ textAlign: 'center', marginTop: Spacing.xl }}>
-        Trackr · by Siryus Creative Media Ltd
+        Trackr v1.0.0
       </Text>
     </Screen>
   );

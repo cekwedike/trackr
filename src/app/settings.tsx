@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, View } from 'react-native';
 
-import { AppHeader, Button, Card, Divider, ListRow, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import { AppHeader, Button, Card, Divider, ListRow, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { SelectField, SelectModal } from '@/components/pickers';
 import { CURRENCIES, findCurrency } from '@/constants/currencies';
+import { getIndustry, INDUSTRIES } from '@/constants/industries';
 import { Radius, Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { updateSettings } from '@/db/repos/settings';
@@ -14,9 +15,10 @@ import { exportBackup, importBackup } from '@/lib/backup';
 
 export default function Settings() {
   const t = useTheme();
-  const { settings, reloadSettings } = useApp();
+  const { settings, reloadSettings, industry, setIndustry } = useApp();
   const [name, setName] = useState('');
   const [currencyModal, setCurrencyModal] = useState(false);
+  const [industryModal, setIndustryModal] = useState(false);
   const [pinModal, setPinModal] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -35,6 +37,21 @@ export default function Settings() {
     const c = findCurrency(code);
     await updateSettings({ currency_code: c.code, currency_symbol: c.symbol });
     await reloadSettings();
+  };
+
+  const chooseIndustry = (id: string) => {
+    setIndustryModal(false);
+    if (!settings || id === settings.industry) return;
+    const target = getIndustry(id);
+    Alert.alert(
+      `Switch to ${target.name}?`,
+      'Your dashboard and labels will re-theme. Keep your current profit split, or replace it with this industry’s template?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Keep my split', onPress: async () => { await setIndustry(id, false); await reloadSettings(); } },
+        { text: 'Use template', onPress: async () => { await setIndustry(id, true); await reloadSettings(); } },
+      ],
+    );
   };
 
   const toggleLock = async () => {
@@ -119,6 +136,7 @@ export default function Settings() {
       <SectionHeader title="Business" />
       <Card style={{ gap: Spacing.md, marginBottom: Spacing.lg }}>
         <TextField label="Business name" value={name} onChangeText={setName} right={<Pressable onPress={saveName}><Text variant="label" color={t.primary}>Save</Text></Pressable>} />
+        <SelectField label="Industry / Dashboard" value={industry.name} onPress={() => setIndustryModal(true)} />
         <SelectField label="Currency" value={`${settings.currency_symbol} · ${settings.currency_code}`} onPress={() => setCurrencyModal(true)} />
       </Card>
 
@@ -143,9 +161,10 @@ export default function Settings() {
       </Card>
 
       <Text variant="caption" color={t.textMuted} style={{ textAlign: 'center', marginTop: Spacing.md }}>
-        Trackr v1.0.0{'\n'}by Siryus Creative Media Ltd
+        Trackr v1.0.0
       </Text>
 
+      <SelectModal visible={industryModal} title="Industry" onClose={() => setIndustryModal(false)} onSelect={chooseIndustry} options={INDUSTRIES.map((i) => ({ id: i.id, label: i.name, sublabel: i.tagline }))} />
       <SelectModal visible={currencyModal} title="Currency" onClose={() => setCurrencyModal(false)} onSelect={setCurrency} options={CURRENCIES.map((c) => ({ id: c.code, label: `${c.symbol}  ${c.code}`, sublabel: c.name }))} />
       <PinModal visible={pinModal} onClose={() => setPinModal(false)} onSave={savePin} />
       {busy ? <View style={{ position: 'absolute' }} /> : null}
@@ -156,13 +175,13 @@ export default function Settings() {
 function ToggleRow({ icon, label, value, onToggle }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: boolean; onToggle: () => void }) {
   const t = useTheme();
   return (
-    <Pressable onPress={onToggle} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
         <Ionicons name={icon} size={20} color={t.textSecondary} />
         <Text variant="body" weight="medium">{label}</Text>
       </View>
-      <Ionicons name={value ? 'toggle' : 'toggle-outline'} size={34} color={value ? t.primary : t.textMuted} />
-    </Pressable>
+      <Toggle value={value} onValueChange={onToggle} />
+    </View>
   );
 }
 

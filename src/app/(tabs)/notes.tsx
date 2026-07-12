@@ -44,7 +44,7 @@ export default function NotesScreen() {
             ))}
           </Card>
         ) : (
-          <EmptyState icon="document-text-outline" title="No notes yet" message="Jot down recipes, ideas, supplier info — and link them together with [[double brackets]]." actionLabel="New note" onAction={create} />
+          <EmptyState icon="document-text-outline" title="No notes yet" message="Jot down recipes, ideas and supplier info — and attach them to customers, products or orders." actionLabel="New note" onAction={create} />
         )}
       </Screen>
       <FAB icon="add" label="Note" onPress={create} />

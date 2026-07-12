@@ -2,8 +2,6 @@
 
 A business tracker for SMEs — an account book, notebook and analytics tool in your pocket. Built with Expo (SDK 57) and offline-first local storage.
 
-_A product of Siryus Creative Media Ltd._
-
 ## Features
 
 - **Dashboard** — revenue, expenses, net profit, low-stock alerts, active orders, debts and upcoming reminders at a glance.

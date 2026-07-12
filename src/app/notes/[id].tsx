@@ -3,17 +3,15 @@ import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
-import { AppHeader, Card, Chip, IconButton, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import { AppHeader, Card, IconButton, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import type { IconName } from '@/components/ui';
 import { SelectModal, type SelectOption } from '@/components/pickers';
 import { Radius, Spacing } from '@/constants/theme';
 import {
   addEntityLink,
   deleteNote,
-  findNoteByTitle,
-  getBacklinks,
   getNote,
   getOutgoingLinks,
-  createNote,
   removeLink,
   togglePinned,
   updateNote,
@@ -26,12 +24,15 @@ import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
 
 const ENTITY_ROUTE: Record<string, string> = {
-  note: '/notes',
   product: '/products',
   customer: '/customers',
   order: '/orders',
-  sale: '/sales',
-  expense: '/expenses',
+};
+
+const ENTITY_META: Record<string, { icon: IconName; label: string }> = {
+  product: { icon: 'cube', label: 'Product' },
+  customer: { icon: 'person', label: 'Customer' },
+  order: { icon: 'clipboard', label: 'Order' },
 };
 
 export default function NoteEditor() {
@@ -52,8 +53,8 @@ export default function NoteEditor() {
   const { data, reload } = useAsyncData(async () => {
     const note = await getNote(noteId);
     if (!note) return null;
-    const [outgoing, backlinks] = await Promise.all([getOutgoingLinks(noteId), getBacklinks(noteId)]);
-    return { note, outgoing, backlinks };
+    const outgoing = await getOutgoingLinks(noteId);
+    return { note, outgoing };
   }, [noteId]);
 
   useEffect(() => {
@@ -65,7 +66,6 @@ export default function NoteEditor() {
     }
   }, [data]);
 
-  // Debounced autosave
   useEffect(() => {
     if (loadedFor.current !== noteId) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -84,17 +84,6 @@ export default function NoteEditor() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => { await deleteNote(noteId); router.back(); } },
     ]);
-  };
-
-  const openWikiLink = async (targetId: number | null, targetTitle: string) => {
-    if (targetId) {
-      router.push(`/notes/${targetId}`);
-    } else {
-      // Create the missing note and open it
-      const existing = await findNoteByTitle(targetTitle);
-      const newId = existing?.id ?? (await createNote({ title: targetTitle, body: '' }));
-      router.push(`/notes/${newId}`);
-    }
   };
 
   const chooseType = async (type: string) => {
@@ -127,8 +116,7 @@ export default function NoteEditor() {
     );
   }
 
-  const entityLinks = data?.outgoing.filter((l) => l.target_type !== 'note') ?? [];
-  const noteLinks = data?.outgoing.filter((l) => l.target_type === 'note') ?? [];
+  const attached = data?.outgoing.filter((l) => l.target_type !== 'note') ?? [];
 
   return (
     <Screen>
@@ -137,72 +125,71 @@ export default function NoteEditor() {
         back
         right={
           <View style={{ flexDirection: 'row' }}>
-            <IconButton icon={pinned ? 'bookmark' : 'bookmark-outline'} tone={pinned ? 'warning' : undefined} onPress={() => { setPinned((v) => !v); togglePinned(noteId, !pinned); }} />
+            <IconButton
+              icon={pinned ? 'bookmark' : 'bookmark-outline'}
+              tone={pinned ? 'warning' : undefined}
+              onPress={() => { setPinned((v) => !v); togglePinned(noteId, !pinned); }}
+            />
             <IconButton icon="trash-outline" tone="danger" onPress={remove} />
           </View>
         }
       />
 
-      <TextField value={title} onChangeText={setTitle} placeholder="Title" style={{ marginBottom: Spacing.md }} />
-      <Card style={{ marginBottom: Spacing.lg }}>
-        <TextField value={body} onChangeText={setBody} placeholder={'Write anything...\nUse [[Note title]] to link notes.'} multiline />
-        <Text variant="caption" color={t.textMuted} style={{ marginTop: Spacing.sm }}>Tip: type [[ ]] around a note title to link it.</Text>
+      <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
+        <TextField value={title} onChangeText={setTitle} placeholder="Note title" />
+        <TextField
+          value={body}
+          onChangeText={setBody}
+          placeholder="Start writing — ideas, supplier details, to-dos, anything…"
+          multiline
+          style={{ minHeight: 220 }}
+        />
+        <Text variant="caption" color={t.textMuted}>Saved automatically</Text>
       </Card>
 
-      <SectionHeader title="Links" action="Link record" onAction={() => setTypeModal(true)} />
+      <SectionHeader title="Attached to" action="Attach" onAction={() => setTypeModal(true)} />
       <Card style={{ gap: Spacing.sm }}>
-        {noteLinks.length === 0 && entityLinks.length === 0 ? (
-          <Text variant="caption" color={t.textMuted}>No links yet. Reference notes with [[title]] or link a record.</Text>
-        ) : null}
-        {noteLinks.map((l) => (
+        {attached.length === 0 ? (
           <Pressable
-            key={l.id}
-            onPress={() => openWikiLink(l.target_id, l.target_title ?? '')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 }}
+            onPress={() => setTypeModal(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
           >
-            <Ionicons name="link" size={16} color={l.target_id ? t.primary : t.textMuted} />
-            <Text variant="body" color={l.target_id ? t.primary : t.textMuted}>
-              {l.resolved_title ?? l.target_title}{l.target_id ? '' : '  (create)'}
-            </Text>
+            <Ionicons name="add-circle-outline" size={20} color={t.primary} />
+            <Text variant="body" color={t.textSecondary}>Link this note to a customer, product or order</Text>
           </Pressable>
-        ))}
-        {entityLinks.map((l) => (
-          <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Pressable
-              onPress={() => l.target_id && router.push(`${ENTITY_ROUTE[l.target_type]}/${l.target_id}` as Href)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}
-            >
-              <Chip label={l.target_type} tone="accent" />
-              <Text variant="body">{l.target_title}</Text>
-            </Pressable>
-            <IconButton icon="close" size={16} onPress={async () => { await removeLink(l.id); reload(); }} />
-          </View>
-        ))}
-      </Card>
-
-      <SectionHeader title="Linked mentions" />
-      <Card style={{ gap: Spacing.sm }}>
-        {data && data.backlinks.length > 0 ? (
-          data.backlinks.map((b) => (
-            <Pressable key={b.id} onPress={() => router.push(`/notes/${b.source_note_id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 }}>
-              <Ionicons name="return-down-back" size={16} color={t.textSecondary} />
-              <Text variant="body">{b.source_title}</Text>
-            </Pressable>
-          ))
         ) : (
-          <Text variant="caption" color={t.textMuted}>No other notes link here yet.</Text>
+          attached.map((l) => {
+            const meta = ENTITY_META[l.target_type] ?? { icon: 'link' as IconName, label: l.target_type };
+            return (
+              <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                <Pressable
+                  onPress={() => l.target_id && router.push(`${ENTITY_ROUTE[l.target_type]}/${l.target_id}` as Href)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1 }}
+                >
+                  <View style={{ width: 38, height: 38, borderRadius: Radius.md, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name={meta.icon} size={18} color={t.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="body" weight="semibold" numberOfLines={1}>{l.target_title}</Text>
+                    <Text variant="caption" color={t.textSecondary}>{meta.label}</Text>
+                  </View>
+                </Pressable>
+                <IconButton icon="close" size={18} onPress={async () => { await removeLink(l.id); reload(); }} />
+              </View>
+            );
+          })
         )}
       </Card>
 
       <SelectModal
         visible={typeModal}
-        title="Link to a record"
+        title="Attach to…"
         searchable={false}
         onClose={() => setTypeModal(false)}
         onSelect={chooseType}
         options={[
-          { id: 'product', label: 'Product' },
           { id: 'customer', label: 'Customer' },
+          { id: 'product', label: 'Product' },
           { id: 'order', label: 'Order' },
         ]}
       />

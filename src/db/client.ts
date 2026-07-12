@@ -191,6 +191,10 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_type, target_id);
   CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(due_at);
   `,
+  // v2: per-industry dashboard selection
+  `
+  ALTER TABLE settings ADD COLUMN industry TEXT NOT NULL DEFAULT 'general';
+  `,
 ];
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {

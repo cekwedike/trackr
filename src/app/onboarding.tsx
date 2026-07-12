@@ -2,13 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Button, Card, Screen, Text, TextField } from '@/components/ui';
+import { Brand, Button, Card, Screen, Text, TextField, Toggle } from '@/components/ui';
 import { CURRENCIES } from '@/constants/currencies';
+import { getIndustry, INDUSTRIES } from '@/constants/industries';
 import { Radius, Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { updateSettings } from '@/db/repos/settings';
 import { useTheme } from '@/hooks/use-theme';
 import { isBiometricAvailable, setPin } from '@/lib/auth';
+import { hexToRgba } from '@/lib/color';
 
 export default function Onboarding() {
   const t = useTheme();
@@ -16,6 +18,8 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
 
   const [name, setName] = useState('');
+  const [industryId, setIndustryId] = useState('general');
+  const [industryQuery, setIndustryQuery] = useState('');
   const [currency, setCurrency] = useState('NGN');
   const [enableLock, setEnableLock] = useState(false);
   const [pin, setPinValue] = useState('');
@@ -42,6 +46,8 @@ export default function Onboarding() {
         business_name: name.trim() || 'My Business',
         currency_code: cur.code,
         currency_symbol: cur.symbol,
+        industry: industryId,
+        profit_allocation: JSON.stringify(getIndustry(industryId).defaultAllocation),
         lock_enabled: enableLock ? 1 : 0,
         biometric_enabled: bio ? 1 : 0,
         onboarded: 1,
@@ -53,23 +59,14 @@ export default function Onboarding() {
     }
   };
 
+  const filteredIndustries = INDUSTRIES.filter((ind) =>
+    industryQuery.trim() === '' ? true : `${ind.name} ${ind.tagline}`.toLowerCase().includes(industryQuery.trim().toLowerCase()),
+  );
+
   return (
-    <Screen>
-      <View style={{ alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing.xl, gap: Spacing.sm }}>
-        <View
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: Radius.xl,
-            backgroundColor: t.primary,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="stats-chart" size={38} color="#FFFFFF" />
-        </View>
-        <Text variant="display">Trackr</Text>
-        <Text variant="caption" color={t.textSecondary}>by Siryus Creative Media Ltd</Text>
+    <Screen scroll>
+      <View style={{ alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing.xl }}>
+        <Brand size={76} showWordmark subtitle="Your business, in your pocket" />
       </View>
 
       {step === 0 ? (
@@ -84,6 +81,50 @@ export default function Onboarding() {
       ) : null}
 
       {step === 1 ? (
+        <Card style={{ gap: Spacing.md }}>
+          <Text variant="subtitle">What do you do?</Text>
+          <Text variant="body" color={t.textSecondary}>
+            Pick the closest fit — this tailors your dashboard, terminology and profit template. You can change it anytime.
+          </Text>
+          <TextField value={industryQuery} onChangeText={setIndustryQuery} placeholder="Search industries" />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+            {filteredIndustries.map((ind) => {
+              const active = ind.id === industryId;
+              return (
+                <Pressable
+                  key={ind.id}
+                  onPress={() => setIndustryId(ind.id)}
+                  style={{
+                    flexBasis: '47%',
+                    flexGrow: 1,
+                    padding: Spacing.md,
+                    borderRadius: Radius.md,
+                    borderWidth: 1.5,
+                    borderColor: active ? ind.accent : t.border,
+                    backgroundColor: active ? hexToRgba(ind.accent, 0.1) : t.card,
+                    gap: Spacing.xs,
+                  }}
+                >
+                  <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: hexToRgba(ind.accent, 0.16), alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name={ind.icon} size={20} color={ind.accent} />
+                  </View>
+                  <Text variant="body" weight="semibold" numberOfLines={1}>{ind.name}</Text>
+                  <Text variant="caption" color={t.textSecondary} numberOfLines={1}>{ind.tagline}</Text>
+                </Pressable>
+              );
+            })}
+            {filteredIndustries.length === 0 ? (
+              <Text variant="caption" color={t.textSecondary}>No match. Try another word or pick “General”.</Text>
+            ) : null}
+          </View>
+          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+            <Button title="Back" variant="ghost" onPress={() => setStep(0)} style={{ flex: 1 }} />
+            <Button title="Continue" icon="arrow-forward" onPress={() => setStep(2)} style={{ flex: 1 }} />
+          </View>
+        </Card>
+      ) : null}
+
+      {step === 2 ? (
         <Card style={{ gap: Spacing.md }}>
           <Text variant="subtitle">Choose your currency</Text>
           <View style={{ gap: Spacing.sm }}>
@@ -117,28 +158,27 @@ export default function Onboarding() {
             })}
           </View>
           <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-            <Button title="Back" variant="ghost" onPress={() => setStep(0)} style={{ flex: 1 }} />
-            <Button title="Continue" icon="arrow-forward" onPress={() => setStep(2)} style={{ flex: 1 }} />
+            <Button title="Back" variant="ghost" onPress={() => setStep(1)} style={{ flex: 1 }} />
+            <Button title="Continue" icon="arrow-forward" onPress={() => setStep(3)} style={{ flex: 1 }} />
           </View>
         </Card>
       ) : null}
 
-      {step === 2 ? (
+      {step === 3 ? (
         <Card style={{ gap: Spacing.lg }}>
           <Text variant="subtitle">Secure your data</Text>
           <Text variant="body" color={t.textSecondary}>
             Lock Trackr with a PIN so only you can open your books. You can change this later in Settings.
           </Text>
 
-          <Pressable
-            onPress={() => setEnableLock((v) => !v)}
+          <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: Spacing.md,
               borderRadius: Radius.md,
-              borderWidth: 1,
+              borderWidth: 1.5,
               borderColor: enableLock ? t.primary : t.border,
             }}
           >
@@ -146,8 +186,8 @@ export default function Onboarding() {
               <Ionicons name="lock-closed" size={20} color={enableLock ? t.primary : t.textSecondary} />
               <Text variant="body" weight="semibold">Enable app lock</Text>
             </View>
-            <Ionicons name={enableLock ? 'toggle' : 'toggle-outline'} size={34} color={enableLock ? t.primary : t.textMuted} />
-          </Pressable>
+            <Toggle value={enableLock} onValueChange={setEnableLock} />
+          </View>
 
           {enableLock ? (
             <View style={{ gap: Spacing.md }}>
@@ -169,23 +209,20 @@ export default function Onboarding() {
                 maxLength={6}
                 placeholder="••••"
               />
-              <Pressable
-                onPress={() => setBiometric((v) => !v)}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-              >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
                   <Ionicons name="finger-print" size={20} color={t.textSecondary} />
                   <Text variant="body">Use fingerprint / face unlock</Text>
                 </View>
-                <Ionicons name={biometric ? 'toggle' : 'toggle-outline'} size={34} color={biometric ? t.primary : t.textMuted} />
-              </Pressable>
+                <Toggle value={biometric} onValueChange={setBiometric} />
+              </View>
             </View>
           ) : null}
 
           {error ? <Text variant="caption" color={t.danger}>{error}</Text> : null}
 
           <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-            <Button title="Back" variant="ghost" onPress={() => setStep(1)} style={{ flex: 1 }} />
+            <Button title="Back" variant="ghost" onPress={() => setStep(2)} style={{ flex: 1 }} />
             <Button title="Finish" icon="checkmark" onPress={finish} loading={saving} style={{ flex: 1 }} />
           </View>
         </Card>

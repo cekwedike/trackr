@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
   Text as RNText,
   TextInput,
+  useWindowDimensions,
   View,
   type StyleProp,
   type TextStyle,
@@ -16,8 +19,71 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { FontSize, FontWeight, Radius, Spacing, type ThemeColors } from '@/constants/theme';
+import { FontSize, FontWeight, MaxContentWidth, Radius, Shadow, Spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+const APP_ICON = require('../../assets/images/icon.png');
+
+/** Logo mark (optionally with wordmark) used on onboarding, lock and loading screens. */
+export function Brand({
+  size = 64,
+  showWordmark = false,
+  wordmarkColor,
+  subtitle,
+}: {
+  size?: number;
+  showWordmark?: boolean;
+  wordmarkColor?: string;
+  subtitle?: string;
+}) {
+  const t = useTheme();
+  return (
+    <View style={{ alignItems: 'center', gap: Spacing.md }}>
+      <Image
+        source={APP_ICON}
+        style={{ width: size, height: size, borderRadius: Math.round(size * 0.26) }}
+        contentFit="cover"
+      />
+      {showWordmark ? (
+        <View style={{ alignItems: 'center', gap: 2 }}>
+          <Text variant="display" color={wordmarkColor}>Trackr</Text>
+          {subtitle ? <Text variant="caption" color={t.textSecondary}>{subtitle}</Text> : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** Animated on/off switch. */
+export function Toggle({
+  value,
+  onValueChange,
+  disabled,
+}: {
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  const t = useTheme();
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: value ? 1 : 0, duration: 180, useNativeDriver: false }).start();
+  }, [value, anim]);
+  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [t.borderStrong, t.primary] });
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [3, 25] });
+  return (
+    <Pressable onPress={() => !disabled && onValueChange(!value)} hitSlop={10} disabled={disabled} style={{ opacity: disabled ? 0.5 : 1 }}>
+      <Animated.View style={{ width: 52, height: 30, borderRadius: 15, backgroundColor: trackColor, justifyContent: 'center' }}>
+        <Animated.View
+          style={[
+            { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', transform: [{ translateX }] },
+            Shadow.sm,
+          ]}
+        />
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Tone = 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'accent' | 'info';
@@ -91,23 +157,25 @@ export function Screen({
   contentStyle?: StyleProp<ViewStyle>;
 }) {
   const t = useTheme();
-  const pad = padded ? { padding: Spacing.lg } : null;
+  const { width } = useWindowDimensions();
+  const hPad = padded ? (width >= 480 ? Spacing.xl : Spacing.lg) : 0;
+  const centered: ViewStyle = { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' };
   if (scroll) {
     return (
       <SafeAreaView edges={['top']} style={[{ flex: 1, backgroundColor: t.background }, style]}>
         <ScrollView
-          contentContainerStyle={[{ paddingBottom: Spacing.xxxl * 2 }, pad, contentStyle]}
+          contentContainerStyle={[{ paddingBottom: Spacing.xxxl * 2, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, contentStyle]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {children}
+          <View style={centered}>{children}</View>
         </ScrollView>
       </SafeAreaView>
     );
   }
   return (
-    <SafeAreaView edges={['top']} style={[{ flex: 1, backgroundColor: t.background }, pad, style]}>
-      {children}
+    <SafeAreaView edges={['top']} style={[{ flex: 1, backgroundColor: t.background }, style]}>
+      <View style={[{ flex: 1, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, centered]}>{children}</View>
     </SafeAreaView>
   );
 }
@@ -131,10 +199,11 @@ export function Card({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: t.border,
     padding: padded ? Spacing.lg : 0,
+    ...Shadow.sm,
   };
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [cardStyle, pressed && { opacity: 0.7 }, style]}>
+      <Pressable onPress={onPress} style={({ pressed }) => [cardStyle, pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] }, style]}>
         {children}
       </Pressable>
     );
@@ -269,6 +338,7 @@ export function TextField({
   maxLength?: number;
 }) {
   const t = useTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <View style={[{ gap: Spacing.xs }, style]}>
       {label ? <Text variant="label" color={t.textSecondary}>{label}</Text> : null}
@@ -278,10 +348,10 @@ export function TextField({
           alignItems: multiline ? 'flex-start' : 'center',
           backgroundColor: t.inputBg,
           borderRadius: Radius.md,
-          borderWidth: 1,
-          borderColor: t.border,
+          borderWidth: 1.5,
+          borderColor: focused ? t.primary : t.border,
           paddingHorizontal: Spacing.md,
-          minHeight: multiline ? 96 : 48,
+          minHeight: multiline ? 96 : 50,
         }}
       >
         {prefix ? <RNText style={{ color: t.textSecondary, fontSize: FontSize.md, marginRight: 4 }}>{prefix}</RNText> : null}
@@ -295,6 +365,8 @@ export function TextField({
           autoFocus={autoFocus}
           secureTextEntry={secureTextEntry}
           maxLength={maxLength}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           style={{
             flex: 1,
             color: t.text,
@@ -346,6 +418,7 @@ export function Segmented<T extends string>({
               borderRadius: Radius.sm,
               backgroundColor: active ? t.card : 'transparent',
               alignItems: 'center',
+              ...(active ? Shadow.sm : null),
             }}
           >
             <RNText

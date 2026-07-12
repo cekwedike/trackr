@@ -11,24 +11,49 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { Image } from 'expo-image';
+
+import { Button, Text } from '@/components/ui';
+import { Colors, Spacing } from '@/constants/theme';
 import { AppProvider, useApp } from '@/context/app-context';
-import { Colors } from '@/constants/theme';
 import { useThemeName } from '@/hooks/use-theme';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+function BrandLoading() {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', gap: Spacing.xxl }}>
+      <Image
+        source={require('../../assets/images/splash-icon.png')}
+        style={{ width: 180, height: 180 }}
+        contentFit="contain"
+      />
+      <ActivityIndicator size="large" color="#FFFFFF" />
+    </View>
+  );
+}
+
+function StartupError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', padding: Spacing.xl, gap: Spacing.lg }}>
+      <Text variant="title" color="#FFFFFF">Couldn&apos;t start</Text>
+      <Text variant="body" color="#DBEAFE" style={{ textAlign: 'center' }}>{message}</Text>
+      <Button title="Try again" icon="refresh" variant="secondary" onPress={onRetry} />
+    </View>
+  );
+}
 
 function RootNavigator() {
-  const { ready, settings, locked } = useApp();
+  const { settings, locked } = useApp();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!ready || !settings) return;
-    SplashScreen.hideAsync();
-
+    if (!settings) return;
     const onboarded = settings.onboarded === 1;
     if (!onboarded) {
       if (pathname !== '/onboarding') router.replace('/onboarding');
@@ -41,7 +66,7 @@ function RootNavigator() {
     if (pathname === '/lock' || pathname === '/onboarding') {
       router.replace('/');
     }
-  }, [ready, settings, locked, pathname, router]);
+  }, [settings, locked, pathname, router]);
 
   return (
     <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
@@ -50,6 +75,21 @@ function RootNavigator() {
       <Stack.Screen name="lock" options={{ animation: 'fade', gestureEnabled: false }} />
     </Stack>
   );
+}
+
+function AppGate() {
+  const { ready, error, retry } = useApp();
+
+  // Hide the native splash as soon as React can draw, so the user always sees
+  // an in-app indicator instead of a frozen splash image.
+  useEffect(() => {
+    const timer = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (error) return <StartupError message={error} onRetry={retry} />;
+  if (!ready) return <BrandLoading />;
+  return <RootNavigator />;
 }
 
 export default function RootLayout() {
@@ -66,8 +106,8 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AppProvider>
           <ThemeProvider value={navTheme}>
-            <StatusBar style={themeName === 'dark' ? 'light' : 'dark'} />
-            <RootNavigator />
+            <StatusBar style="light" />
+            <AppGate />
           </ThemeProvider>
         </AppProvider>
       </SafeAreaProvider>

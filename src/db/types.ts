@@ -9,6 +9,7 @@ export interface Settings {
   currency_code: string;
   currency_symbol: string;
   locale: string;
+  industry: string;
   profit_allocation: string; // JSON string of AllocationBucket[]
   lock_enabled: number;
   biometric_enabled: number;

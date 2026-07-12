@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { AllocationDonut, DONUT_COLORS } from '@/components/anim';
 import { AppHeader, Button, Card, Chip, Divider, IconButton, Screen, SectionHeader, Segmented, Text, TextField } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { getIndustry } from '@/constants/industries';
 import { useApp } from '@/context/app-context';
 import { sumExpenses } from '@/db/repos/expenses';
 import { sumSales } from '@/db/repos/sales';
@@ -16,7 +18,7 @@ import { allocationTotal, computeProfit, DEFAULT_ALLOCATION, parseAllocation, sp
 
 export default function ProfitScreen() {
   const t = useTheme();
-  const { settings, money, reloadSettings } = useApp();
+  const { settings, money, reloadSettings, industry } = useApp();
   const [range, setRange] = useState<RangeKey>('month');
   const [editing, setEditing] = useState(false);
   const [buckets, setBuckets] = useState<AllocationBucket[]>(DEFAULT_ALLOCATION);
@@ -54,6 +56,16 @@ export default function ProfitScreen() {
   };
   const addBucket = () => setBuckets((prev) => [...prev, { name: 'New', percent: 0 }]);
   const removeBucket = (idx: number) => setBuckets((prev) => prev.filter((_, i) => i !== idx));
+  const resetToDefault = () => {
+    Alert.alert(
+      `Reset to ${industry.name} default?`,
+      'This replaces the buckets below with the recommended template. Nothing is saved until you tap Save.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reset', onPress: () => setBuckets(getIndustry(settings?.industry).defaultAllocation.map((b) => ({ ...b }))) },
+      ],
+    );
+  };
 
   return (
     <Screen>
@@ -92,7 +104,7 @@ export default function ProfitScreen() {
         {manualMinor > 0 ? (
           <Chip label={`Splitting ${money(manualMinor)} (manual)`} tone="primary" />
         ) : (
-          <Text variant="caption" color={t.textSecondary}>Splitting net profit for the selected period.</Text>
+          <Text variant="caption" color={t.textSecondary}>Splitting net profit for the selected period. These percentages are your own editable targets — tap “Edit split” to change them.</Text>
         )}
 
         {editing ? (
@@ -109,21 +121,29 @@ export default function ProfitScreen() {
               <Chip label={`Total ${total}%`} tone={Math.round(total) === 100 ? 'success' : 'danger'} />
             </View>
             <Button title="Save allocation" icon="checkmark" onPress={saveAllocation} />
+            <Button title={`Reset to ${industry.name} default`} icon="refresh" variant="ghost" onPress={resetToDefault} />
           </>
         ) : (
-          split.map((s, idx) => (
-            <View key={idx}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.primary }} />
-                  <Text variant="body">{s.name}</Text>
-                  <Text variant="caption" color={t.textMuted}>{s.percent}%</Text>
-                </View>
-                <Text variant="body" weight="semibold">{money(s.amount)}</Text>
+          <>
+            {split.length > 0 ? (
+              <View style={{ alignItems: 'center', marginVertical: Spacing.sm }}>
+                <AllocationDonut data={split.map((s) => ({ label: s.name, percent: s.percent }))} size={148} trackColor={t.border} />
               </View>
-              {idx < split.length - 1 ? <Divider /> : null}
-            </View>
-          ))
+            ) : null}
+            {split.map((s, idx) => (
+              <View key={idx}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: DONUT_COLORS[idx % DONUT_COLORS.length] }} />
+                    <Text variant="body">{s.name}</Text>
+                    <Text variant="caption" color={t.textMuted}>{s.percent}%</Text>
+                  </View>
+                  <Text variant="body" weight="semibold">{money(s.amount)}</Text>
+                </View>
+                {idx < split.length - 1 ? <Divider /> : null}
+              </View>
+            ))}
+          </>
         )}
       </Card>
 
