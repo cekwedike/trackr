@@ -199,6 +199,23 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE notes ADD COLUMN color TEXT;
   `,
+  // v4: monthly profit records — a per-month snapshot of the cash-basis income
+  // statement and how the realized net profit was allocated (source of truth per month)
+  `
+  CREATE TABLE IF NOT EXISTS profit_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    month TEXT NOT NULL UNIQUE,
+    revenue INTEGER NOT NULL DEFAULT 0,
+    cogs INTEGER NOT NULL DEFAULT 0,
+    expenses INTEGER NOT NULL DEFAULT 0,
+    net_profit INTEGER NOT NULL DEFAULT 0,
+    allocation TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_profit_records_month ON profit_records(month);
+  `,
 ];
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {

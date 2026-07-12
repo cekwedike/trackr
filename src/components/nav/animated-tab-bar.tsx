@@ -115,6 +115,7 @@ export function AnimatedTabBar({ state, descriptors, navigation, insets }: Anima
 
   const count = state.routes.length;
   const itemW = count > 0 ? rowW / count : 0;
+  const pillW = itemW > 0 ? Math.max(44, Math.min(64, itemW - Spacing.md)) : 0;
   const pos = useSharedValue(state.index);
 
   useEffect(() => {
@@ -149,10 +150,12 @@ export function AnimatedTabBar({ state, descriptors, navigation, insets }: Anima
           <Animated.View style={[{ height: '100%', alignItems: 'center', justifyContent: 'center' }, pillStyle]}>
             <View
               style={{
-                width: 56,
-                height: 34,
+                width: pillW,
+                height: 40,
                 borderRadius: Radius.pill,
                 backgroundColor: hexToRgba(accent, 0.14),
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: hexToRgba(accent, 0.22),
               }}
             />
           </Animated.View>

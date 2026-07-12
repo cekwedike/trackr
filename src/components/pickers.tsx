@@ -1,18 +1,28 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 
-import { Button, Divider, IconButton, Text, TextField } from '@/components/ui';
-import { FontSize, Radius, Spacing } from '@/constants/theme';
+import { Button, IconButton, Text, TextField, type IconName } from '@/components/ui';
+import { INDUSTRIES } from '@/constants/industries';
+import { FontSize, Radius, Shadow, Spacing } from '@/constants/theme';
+import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
+import { hexToRgba } from '@/lib/color';
 import { formatDateTime, formatDate } from '@/lib/date';
 
 export interface SelectOption {
   id: string;
   label: string;
   sublabel?: string;
+  /** Optional leading icon. Falls back to the matching industry icon when the option id is an industry. */
+  icon?: IconName;
+  /** Optional accent tint for the row. Falls back to the matching industry accent. */
+  tint?: string;
 }
+
+const industryById = (id: string) => INDUSTRIES.find((i) => i.id === id);
 
 export function SelectModal({
   visible,
@@ -24,6 +34,7 @@ export function SelectModal({
   footerLabel,
   onFooter,
   allowClear,
+  selectedId,
 }: {
   visible: boolean;
   title: string;
@@ -34,8 +45,11 @@ export function SelectModal({
   footerLabel?: string;
   onFooter?: () => void;
   allowClear?: boolean;
+  /** Highlights the currently-selected row. Falls back to the active industry for industry lists. */
+  selectedId?: string;
 }) {
   const t = useTheme();
+  const { accent, industry } = useApp();
   const [query, setQuery] = useState('');
   const filtered = useMemo(() => {
     if (!query.trim()) return options;
@@ -43,60 +57,141 @@ export function SelectModal({
     return options.filter((o) => o.label.toLowerCase().includes(q) || o.sublabel?.toLowerCase().includes(q));
   }, [options, query]);
 
+  const isSelected = (o: SelectOption) => {
+    if (selectedId != null) return o.id === selectedId;
+    const ind = industryById(o.id);
+    return ind ? ind.id === industry.id : false;
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: t.overlay }} onPress={onClose} />
-      <View
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <Animated.View entering={FadeIn.duration(180)} style={{ flex: 1, backgroundColor: t.overlay }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+      </Animated.View>
+      <Animated.View
+        entering={SlideInDown.springify().damping(20).stiffness(180)}
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          maxHeight: '80%',
-          backgroundColor: t.background,
+          maxHeight: '82%',
+          backgroundColor: t.card,
           borderTopLeftRadius: Radius.xl,
           borderTopRightRadius: Radius.xl,
-          padding: Spacing.lg,
+          paddingTop: Spacing.sm,
+          paddingHorizontal: Spacing.lg,
+          paddingBottom: Spacing.xl,
           gap: Spacing.md,
+          ...Shadow.lg,
         }}
       >
+        <View
+          style={{
+            alignSelf: 'center',
+            width: 44,
+            height: 5,
+            borderRadius: 3,
+            backgroundColor: hexToRgba(accent, 0.55),
+            marginBottom: Spacing.xs,
+          }}
+        />
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text variant="subtitle">{title}</Text>
+          <Text variant="title">{title}</Text>
           <IconButton icon="close" onPress={onClose} />
         </View>
-        {searchable ? (
-          <TextField value={query} onChangeText={setQuery} placeholder="Search..." />
-        ) : null}
-        <ScrollView style={{ maxHeight: 360 }} keyboardShouldPersistTaps="handled">
+        {searchable ? <TextField value={query} onChangeText={setQuery} placeholder="Search..." /> : null}
+        <ScrollView
+          style={{ maxHeight: 420 }}
+          contentContainerStyle={{ gap: Spacing.sm, paddingBottom: Spacing.sm }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {allowClear ? (
-            <>
-              <Pressable
-                onPress={() => {
-                  onSelect('');
-                  onClose();
+            <Pressable
+              onPress={() => {
+                onSelect('');
+                onClose();
+              }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: Spacing.md,
+                padding: Spacing.md,
+                borderRadius: Radius.md,
+                backgroundColor: t.cardAlt,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: Radius.md,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: t.card,
                 }}
-                style={{ paddingVertical: Spacing.md }}
               >
-                <Text variant="body" color={t.textSecondary}>None</Text>
-              </Pressable>
-              <Divider />
-            </>
+                <Ionicons name="close-circle-outline" size={20} color={t.textMuted} />
+              </View>
+              <Text variant="body" weight="medium" color={t.textSecondary}>
+                None
+              </Text>
+            </Pressable>
           ) : null}
-          {filtered.map((o) => (
-            <View key={o.id}>
+          {filtered.map((o) => {
+            const ind = industryById(o.id);
+            const icon = o.icon ?? ind?.icon;
+            const tint = o.tint ?? ind?.accent ?? accent;
+            const selected = isSelected(o);
+            return (
               <Pressable
+                key={o.id}
                 onPress={() => {
                   onSelect(o.id);
                   onClose();
                 }}
-                style={({ pressed }) => ({ paddingVertical: Spacing.md, opacity: pressed ? 0.6 : 1 })}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: Spacing.md,
+                  padding: Spacing.md,
+                  borderRadius: Radius.md,
+                  borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
+                  borderColor: selected ? tint : t.border,
+                  backgroundColor: selected ? hexToRgba(tint, 0.12) : t.cardAlt,
+                  opacity: pressed ? 0.75 : 1,
+                })}
               >
-                <Text variant="body" weight="medium">{o.label}</Text>
-                {o.sublabel ? <Text variant="caption" color={t.textSecondary}>{o.sublabel}</Text> : null}
+                {icon ? (
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: Radius.md,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: hexToRgba(tint, selected ? 0.2 : 0.14),
+                    }}
+                  >
+                    <Ionicons name={icon} size={20} color={tint} />
+                  </View>
+                ) : null}
+                <View style={{ flex: 1 }}>
+                  <Text variant="body" weight="semibold">
+                    {o.label}
+                  </Text>
+                  {o.sublabel ? (
+                    <Text variant="caption" color={t.textSecondary} numberOfLines={1}>
+                      {o.sublabel}
+                    </Text>
+                  ) : null}
+                </View>
+                {selected ? <Ionicons name="checkmark-circle" size={22} color={tint} /> : null}
               </Pressable>
-              <Divider />
-            </View>
-          ))}
+            );
+          })}
           {filtered.length === 0 ? (
             <Text variant="caption" color={t.textMuted} style={{ paddingVertical: Spacing.lg, textAlign: 'center' }}>
               No matches
@@ -113,7 +208,7 @@ export function SelectModal({
             }}
           />
         ) : null}
-      </View>
+      </Animated.View>
     </Modal>
   );
 }

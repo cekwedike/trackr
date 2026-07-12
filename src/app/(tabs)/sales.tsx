@@ -8,7 +8,7 @@ import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listSales } from '@/db/repos/sales';
 import { useAsyncData } from '@/hooks/use-async-data';
-import { useFabActions } from '@/hooks/use-fab-actions';
+import { useQuickActionCandidates } from '@/hooks/use-fab-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateTime } from '@/lib/date';
 
@@ -25,7 +25,7 @@ export default function SalesScreen() {
   const t = useTheme();
   const { money, terms } = useApp();
   const { data } = useAsyncData(() => listSales(), []);
-  const fabActions = useFabActions(['sale', 'expense', 'customer']);
+  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['sale', 'expense', 'customer']);
 
   const total = (data ?? []).reduce((s, x) => s + x.total, 0);
 
@@ -66,7 +66,7 @@ export default function SalesScreen() {
           />
         )}
       </Screen>
-      <MovableFab actions={fabActions} storageKey="sales" />
+      <MovableFab actions={fabActions} defaultKeys={defaultKeys} storageKey="sales" />
     </>
   );
 }

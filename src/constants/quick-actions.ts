@@ -10,7 +10,7 @@ export const QUICK_ACTION_META: Record<QuickActionKey, { icon: IconName; href: H
   order: { icon: 'clipboard', href: '/orders/new' as Href, label: (t) => `New ${t.order.toLowerCase()}` },
   product: { icon: 'cube', href: '/products/new' as Href, label: (t) => `New ${t.item.toLowerCase()}` },
   customer: { icon: 'person-add', href: '/customers/new' as Href, label: (t) => `New ${t.customer.toLowerCase()}` },
-  profit: { icon: 'calculator', href: '/profit' as Href, label: () => 'Profit split' },
+  profit: { icon: 'calculator', href: '/profit' as Href, label: () => 'Profit' },
   reminder: { icon: 'alarm', href: '/reminders/new' as Href, label: () => 'Reminder' },
   recipe: { icon: 'reader', href: '/recipes/new' as Href, label: (t) => `New ${t.productionLabel.toLowerCase().replace(/s$/, '')}` },
 };

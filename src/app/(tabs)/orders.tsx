@@ -10,7 +10,7 @@ import { useApp } from '@/context/app-context';
 import { listOrders } from '@/db/repos/orders';
 import type { OrderStatus } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
-import { useFabActions } from '@/hooks/use-fab-actions';
+import { useQuickActionCandidates } from '@/hooks/use-fab-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/lib/date';
 
@@ -34,7 +34,7 @@ export default function OrdersScreen() {
   const { money, terms } = useApp();
   const [filter, setFilter] = useState<'active' | 'all'>('active');
   const { data } = useAsyncData(() => listOrders(), []);
-  const fabActions = useFabActions(['order', 'customer', 'expense']);
+  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['order', 'customer', 'expense']);
 
   const orders = (data ?? []).filter((o) => (filter === 'active' ? o.status !== 'delivered' && o.status !== 'cancelled' : true));
 
@@ -76,7 +76,7 @@ export default function OrdersScreen() {
           />
         )}
       </Screen>
-      <MovableFab actions={fabActions} storageKey="orders" />
+      <MovableFab actions={fabActions} defaultKeys={defaultKeys} storageKey="orders" />
     </>
   );
 }

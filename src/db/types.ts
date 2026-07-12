@@ -23,6 +23,29 @@ export interface AllocationBucket {
   percent: number;
 }
 
+/** A resolved allocation slice: a bucket plus the money (minor units) assigned to it. */
+export interface AllocationSlice {
+  name: string;
+  percent: number;
+  amount: number;
+}
+
+/**
+ * A saved monthly profit snapshot (cash-basis). One row per calendar month.
+ * Amounts are integer minor units; `allocation` is a JSON `AllocationSlice[]`.
+ */
+export interface ProfitRecord {
+  id: number;
+  month: string; // 'YYYY-MM'
+  revenue: number;
+  cogs: number;
+  expenses: number;
+  net_profit: number;
+  allocation: string; // JSON string of AllocationSlice[]
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Product {
   id: number;
   name: string;

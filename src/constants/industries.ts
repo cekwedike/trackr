@@ -20,7 +20,11 @@ export type WidgetKey =
 
 export type QuickActionKey = 'sale' | 'expense' | 'order' | 'product' | 'customer' | 'profit' | 'reminder' | 'recipe';
 
-/** Which entity screens surface as bottom-tab destinations for an industry. */
+/**
+ * Which entity screens surface as bottom-tab destinations for an industry.
+ * Keep this to at most 2 entries per industry: the tab bar shows Home + up to
+ * two of these + a "More" entry, for a maximum of 4 destinations.
+ */
 export type NavTabKey = 'sales' | 'orders' | 'inventory' | 'customers';
 
 export interface IndustryTerms {

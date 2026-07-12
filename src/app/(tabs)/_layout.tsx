@@ -61,6 +61,7 @@ export default function TabsLayout() {
         name="notes"
         options={{
           title: 'Notes',
+          href: null,
           tabBarIcon: ({ color, size }) => <Ionicons name="document-text" size={size} color={color} />,
         }}
       />

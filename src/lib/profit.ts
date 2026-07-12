@@ -1,4 +1,5 @@
-import type { AllocationBucket } from '@/db/types';
+import type { AllocationBucket, AllocationSlice } from '@/db/types';
+import { dayjs } from '@/lib/date';
 
 export const DEFAULT_ALLOCATION: AllocationBucket[] = [
   { name: 'Back into business', percent: 50 },
@@ -27,11 +28,11 @@ export function allocationTotal(buckets: AllocationBucket[]): number {
 export function splitAllocation(
   profitMinor: number,
   buckets: AllocationBucket[],
-): { name: string; percent: number; amount: number }[] {
+): AllocationSlice[] {
   const safe = Math.max(0, profitMinor);
   const rows = buckets.map((b) => ({
     name: b.name,
-    percent: b.percent,
+    percent: Number(b.percent) || 0,
     amount: Math.floor((safe * (Number(b.percent) || 0)) / 100),
   }));
   const distributed = rows.reduce((sum, r) => sum + r.amount, 0);
@@ -58,4 +59,57 @@ export function computeProfit(revenue: number, cogs: number, expenses: number): 
   const netProfit = grossProfit - expenses;
   const margin = revenue > 0 ? netProfit / revenue : 0;
   return { revenue, cogs, expenses, grossProfit, netProfit, margin };
+}
+
+/**
+ * Realized (distributable) profit for a month. Under sound bookkeeping you only
+ * distribute profit that actually exists, so a break-even or loss month yields 0.
+ */
+export function realizedProfit(netProfit: number): number {
+  return Math.max(0, netProfit);
+}
+
+// ---------- Month key helpers ('YYYY-MM') ----------
+
+/** The calendar month key for "now", e.g. '2026-07'. */
+export function currentMonthKey(): string {
+  return dayjs().format('YYYY-MM');
+}
+
+/** Shift a month key by a number of months (positive = later). */
+export function shiftMonthKey(key: string, delta: number): string {
+  return dayjs(`${key}-01`).add(delta, 'month').format('YYYY-MM');
+}
+
+/** Inclusive ISO bounds covering the whole month, for range queries. */
+export function monthBounds(key: string): { start: string; end: string } {
+  const m = dayjs(`${key}-01`);
+  return { start: m.startOf('month').toISOString(), end: m.endOf('month').toISOString() };
+}
+
+/** Human label for a month key, e.g. 'July 2026'. */
+export function formatMonthKey(key: string): string {
+  return dayjs(`${key}-01`).format('MMMM YYYY');
+}
+
+/** Short human label for a month key, e.g. "Jul '26". */
+export function formatMonthKeyShort(key: string): string {
+  return dayjs(`${key}-01`).format("MMM 'YY");
+}
+
+/** True when the month key is the current month or in the past (i.e. not the future). */
+export function isCurrentOrPastMonth(key: string): boolean {
+  return dayjs(`${key}-01`).startOf('month').isSameOrBefore(dayjs().startOf('month'));
+}
+
+/** Parse a stored allocation JSON snapshot into typed slices. */
+export function parseAllocationSlices(json: string | null | undefined): AllocationSlice[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    if (Array.isArray(parsed)) return parsed as AllocationSlice[];
+    return [];
+  } catch {
+    return [];
+  }
 }

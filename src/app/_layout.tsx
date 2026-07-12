@@ -70,14 +70,18 @@ function RootNavigator() {
     if (!settings) return;
     const onboarded = settings.onboarded === 1;
     if (!onboarded) {
-      if (pathname !== '/onboarding') router.replace('/onboarding');
+      // Brand-new users land on the welcome/landing screen first; its "Get
+      // started" CTA pushes them into the onboarding wizard. We gate purely on
+      // `onboarded`, so once the wizard finishes (onboarded === 1) neither the
+      // welcome nor the onboarding screen is ever shown again.
+      if (pathname !== '/welcome' && pathname !== '/onboarding') router.replace('/welcome');
       return;
     }
     if (locked) {
       if (pathname !== '/lock') router.replace('/lock');
       return;
     }
-    if (pathname === '/lock' || pathname === '/onboarding') {
+    if (pathname === '/lock' || pathname === '/onboarding' || pathname === '/welcome') {
       router.replace('/');
     }
   }, [settings, locked, pathname, router]);
@@ -93,7 +97,8 @@ function RootNavigator() {
       }}
     >
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+      <Stack.Screen name="welcome" options={{ animation: 'fade', gestureEnabled: false }} />
+      <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="lock" options={{ animation: 'fade', gestureEnabled: false }} />
     </Stack>
   );

@@ -34,7 +34,7 @@ export default function More() {
     const money: Item[] = [];
     if (modules.sales) money.push({ icon: 'cart', tone: 'success', title: `${terms.sales} history`, subtitle: `All recorded ${terms.sales.toLowerCase()}`, href: '/sales' });
     money.push({ icon: 'wallet', tone: 'danger', title: 'Expenses', subtitle: 'Track what you spend', href: '/expenses' });
-    money.push({ icon: 'calculator', tone: 'primary', title: 'Profit calculator', subtitle: 'Profit & allocation', href: '/profit' });
+    money.push({ icon: 'calculator', tone: 'primary', title: 'Profit Calculator', subtitle: 'Profit & allocation', href: '/profit' });
     money.push({ icon: 'bar-chart', tone: 'accent', title: 'Analytics', subtitle: 'Trends & best sellers', href: '/analytics' });
     g.push({ title: 'Money', items: money });
 
@@ -48,7 +48,13 @@ export default function More() {
     if (modules.recipes) cat.push({ icon: 'restaurant', tone: 'success', title: terms.productionLabel, subtitle: 'Cost & profit per batch', href: '/recipes' });
     if (cat.length) g.push({ title: terms.inventoryLabel, items: cat });
 
-    g.push({ title: 'Productivity', items: [{ icon: 'alarm', tone: 'primary', title: 'Reminders', subtitle: 'Never forget a task', href: '/reminders' }] });
+    g.push({
+      title: 'Productivity',
+      items: [
+        { icon: 'document-text', tone: 'info', title: 'Notes', subtitle: 'Jot down ideas & to-dos', href: '/notes' },
+        { icon: 'alarm', tone: 'primary', title: 'Reminders', subtitle: 'Never forget a task', href: '/reminders' },
+      ],
+    });
     return g;
   }, [modules.sales, modules.customers, modules.orders, modules.inventory, modules.recipes, terms]);
 

@@ -9,7 +9,7 @@ import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listCustomers } from '@/db/repos/customers';
 import { useAsyncData } from '@/hooks/use-async-data';
-import { useFabActions } from '@/hooks/use-fab-actions';
+import { useQuickActionCandidates } from '@/hooks/use-fab-actions';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function CustomersScreen() {
@@ -17,7 +17,7 @@ export default function CustomersScreen() {
   const { money, terms } = useApp();
   const [search, setSearch] = useState('');
   const { data } = useAsyncData(() => listCustomers(), []);
-  const fabActions = useFabActions(['customer', 'order', 'sale']);
+  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['customer', 'order', 'sale']);
 
   const filtered = (data ?? []).filter((c) => c.name.toLowerCase().includes(search.toLowerCase()) || (c.phone ?? '').includes(search));
 
@@ -54,7 +54,7 @@ export default function CustomersScreen() {
           />
         )}
       </Screen>
-      <MovableFab actions={fabActions} storageKey="customers" />
+      <MovableFab actions={fabActions} defaultKeys={defaultKeys} storageKey="customers" />
     </>
   );
 }

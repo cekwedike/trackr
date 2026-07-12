@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { isBiometricAvailable, setPin } from '@/lib/auth';
 import { hexToRgba } from '@/lib/color';
 import { successFeedback } from '@/lib/haptics';
+import { PermissionRationale, requestNotifications, type PermissionOutcome } from '@/lib/permissions';
 
 export default function Onboarding() {
   const t = useTheme();
@@ -30,6 +31,17 @@ export default function Onboarding() {
   const [biometric, setBiometric] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [notifOutcome, setNotifOutcome] = useState<PermissionOutcome | null>(null);
+  const [requestingNotif, setRequestingNotif] = useState(false);
+
+  const enableNotifications = async () => {
+    setRequestingNotif(true);
+    try {
+      setNotifOutcome(await requestNotifications());
+    } finally {
+      setRequestingNotif(false);
+    }
+  };
 
   const finish = async () => {
     setError('');
@@ -179,7 +191,66 @@ export default function Onboarding() {
       ) : null}
 
       {step === 3 ? (
-        <FadeSlide key="s3">
+        <FadeSlide key="s3n">
+        <Card style={{ gap: Spacing.lg }}>
+          <Text variant="subtitle">{PermissionRationale.notifications.title}</Text>
+          <Text variant="body" color={t.textSecondary}>
+            {PermissionRationale.notifications.message}
+          </Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: Spacing.md,
+              padding: Spacing.md,
+              borderRadius: Radius.md,
+              backgroundColor: t.primarySoft,
+            }}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: hexToRgba(t.primary, 0.16), alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="notifications" size={22} color={t.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text variant="body" weight="semibold">Reminders</Text>
+              <Text variant="caption" color={t.textSecondary}>Payments, restocks and follow-ups — never miss one.</Text>
+            </View>
+            {notifOutcome === 'granted' ? <Ionicons name="checkmark-circle" size={24} color={t.success} /> : null}
+          </View>
+
+          {notifOutcome === 'granted' ? (
+            <Text variant="caption" color={t.success}>Notifications enabled. You&apos;re all set.</Text>
+          ) : notifOutcome === 'denied' ? (
+            <Text variant="caption" color={t.textSecondary}>
+              No problem — you can turn reminders on anytime from Settings.
+            </Text>
+          ) : null}
+
+          {notifOutcome !== 'granted' ? (
+            <Button
+              title={notifOutcome === 'denied' ? 'Try again' : 'Enable reminders'}
+              icon="notifications-outline"
+              onPress={enableNotifications}
+              loading={requestingNotif}
+            />
+          ) : null}
+
+          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+            <Button title="Back" variant="ghost" onPress={() => setStep(2)} style={{ flex: 1 }} />
+            <Button
+              title={notifOutcome === 'granted' ? 'Continue' : 'Skip for now'}
+              icon="arrow-forward"
+              variant={notifOutcome === 'granted' ? 'primary' : 'secondary'}
+              onPress={() => setStep(4)}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </Card>
+        </FadeSlide>
+      ) : null}
+
+      {step === 4 ? (
+        <FadeSlide key="s4">
         <Card style={{ gap: Spacing.lg }}>
           <Text variant="subtitle">Secure your data</Text>
           <Text variant="body" color={t.textSecondary}>
@@ -237,7 +308,7 @@ export default function Onboarding() {
           {error ? <Text variant="caption" color={t.danger}>{error}</Text> : null}
 
           <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-            <Button title="Back" variant="ghost" onPress={() => setStep(2)} style={{ flex: 1 }} />
+            <Button title="Back" variant="ghost" onPress={() => setStep(3)} style={{ flex: 1 }} />
             <Button title="Finish" icon="checkmark" onPress={finish} loading={saving} style={{ flex: 1 }} />
           </View>
         </Card>

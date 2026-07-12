@@ -5,14 +5,14 @@ import { MovableFab } from '@/components/nav';
 import { Screen } from '@/components/ui';
 import { useApp } from '@/context/app-context';
 import { useAsyncData } from '@/hooks/use-async-data';
-import { useFabActions } from '@/hooks/use-fab-actions';
+import { useQuickActionCandidates } from '@/hooks/use-fab-actions';
 import { EMPTY_DASHBOARD, loadDashboard } from '@/lib/dashboard-data';
 import type { RangeKey } from '@/lib/date';
 
 export default function Dashboard() {
   const { settings, industry } = useApp();
   const [range, setRange] = useState<RangeKey>('month');
-  const fabActions = useFabActions();
+  const { actions: fabActions, defaultKeys } = useQuickActionCandidates();
 
   const { data } = useAsyncData(
     () => loadDashboard(range, settings?.profit_allocation),
@@ -26,7 +26,7 @@ export default function Dashboard() {
       <Screen scroll>
         <DashboardRenderer widgets={industry.widgets} data={dash} range={range} setRange={setRange} />
       </Screen>
-      <MovableFab actions={fabActions} storageKey="dashboard" />
+      <MovableFab actions={fabActions} defaultKeys={defaultKeys} storageKey="dashboard" />
     </>
   );
 }
