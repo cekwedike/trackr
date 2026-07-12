@@ -3,9 +3,11 @@ import 'react-native-gesture-handler';
 import {
   DarkTheme as NavDark,
   DefaultTheme as NavLight,
+  Stack,
   ThemeProvider,
-} from '@react-navigation/native';
-import { Stack, usePathname, useRouter } from 'expo-router';
+  usePathname,
+  useRouter,
+} from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
