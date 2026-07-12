@@ -21,7 +21,7 @@ export default function CustomerDetail() {
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState('');
 
-  const { data, reload } = useAsyncData(async () => {
+  const { data, loading, reload } = useAsyncData(async () => {
     const customer = await getCustomer(customerId);
     if (!customer) return null;
     const notes = await getNotesLinkingEntity('customer', customerId);
@@ -36,7 +36,8 @@ export default function CustomerDetail() {
     reload();
   };
 
-  if (data === null) {
+  if (!data) {
+    if (loading) return null;
     return (
       <Screen>
         <AppHeader title={terms.customer} back />
@@ -44,7 +45,6 @@ export default function CustomerDetail() {
       </Screen>
     );
   }
-  if (!data) return null;
   if (editing) return <CustomerForm initial={data.customer} onDone={() => { setEditing(false); reload(); }} />;
 
   const { customer, notes } = data;

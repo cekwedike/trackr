@@ -38,15 +38,6 @@ export default function Inventory() {
     return { products, ingredients, recipes, recipeCosts };
   }, []);
 
-  const fabActions = useMemo<FabAction[]>(() => {
-    const list: FabAction[] = [
-      { key: 'product', icon: 'cube', label: `New ${terms.item.toLowerCase()}`, onPress: () => router.push('/products/new') },
-    ];
-    if (modules.ingredients) list.push({ key: 'ingredient', icon: 'flask', label: `New ${terms.ingredient.toLowerCase()}`, onPress: () => router.push('/ingredients/new') });
-    if (modules.recipes) list.push({ key: 'recipe', icon: 'reader', label: `New ${terms.productionLabel.toLowerCase().replace(/s$/, '')}`, onPress: () => router.push('/recipes/new') });
-    return list;
-  }, [modules.ingredients, modules.recipes, terms.item, terms.ingredient, terms.productionLabel]);
-
   return (
     <>
       <Screen>
@@ -127,7 +118,7 @@ export default function Inventory() {
           )
         ) : null}
       </Screen>
-      <MovableFab actions={fabActions} storageKey="inventory" />
+      <MovableFab actions={actions} defaultKeys={defaultKeys} storageKey="inventory" />
     </>
   );
 }

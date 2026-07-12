@@ -87,28 +87,67 @@ export function SelectModal({
           backgroundColor: t.card,
           borderTopLeftRadius: Radius.xl,
           borderTopRightRadius: Radius.xl,
-          paddingTop: Spacing.sm,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderLeftWidth: StyleSheet.hairlineWidth,
+          borderRightWidth: StyleSheet.hairlineWidth,
+          borderColor: t.border,
+          paddingTop: Spacing.md,
           paddingHorizontal: Spacing.lg,
           paddingBottom: Spacing.xl,
           gap: Spacing.md,
           ...Shadow.lg,
         }}
       >
-        <View
-          style={{
-            alignSelf: 'center',
-            width: 44,
-            height: 5,
-            borderRadius: 3,
-            backgroundColor: hexToRgba(accent, 0.55),
-            marginBottom: Spacing.xs,
-          }}
-        />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text variant="title">{title}</Text>
-          <IconButton icon="close" onPress={onClose} />
+        <View style={{ alignItems: 'center', paddingBottom: Spacing.xs }}>
+          <View
+            style={{
+              width: 40,
+              height: 5,
+              borderRadius: Radius.pill,
+              backgroundColor: hexToRgba(accent, 0.5),
+            }}
+          />
         </View>
-        {searchable ? <TextField value={query} onChangeText={setQuery} placeholder="Search..." /> : null}
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Text variant="title" numberOfLines={1}>{title}</Text>
+          </View>
+          <IconButton icon="close" tone="default" onPress={onClose} />
+        </View>
+
+        {searchable ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: Spacing.sm,
+              backgroundColor: t.inputBg,
+              borderRadius: Radius.md,
+              borderWidth: 1.5,
+              borderColor: searchFocused ? accent : t.border,
+              paddingHorizontal: Spacing.md,
+              height: 50,
+            }}
+          >
+            <Ionicons name="search" size={18} color={searchFocused ? accent : t.textMuted} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search..."
+              placeholderTextColor={t.textMuted}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              style={{ flex: 1, color: t.text, fontSize: FontSize.md, paddingVertical: Spacing.sm }}
+            />
+            {query.length > 0 ? (
+              <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color={t.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
         <ScrollView
           style={{ maxHeight: 420 }}
           contentContainerStyle={{ gap: Spacing.sm, paddingBottom: Spacing.sm }}
@@ -118,6 +157,7 @@ export function SelectModal({
           {allowClear ? (
             <Pressable
               onPress={() => {
+                selectionFeedback();
                 onSelect('');
                 onClose();
               }}
@@ -125,8 +165,12 @@ export function SelectModal({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: Spacing.md,
-                padding: Spacing.md,
+                paddingHorizontal: Spacing.md,
+                paddingVertical: Spacing.sm,
+                minHeight: 60,
                 borderRadius: Radius.md,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: t.border,
                 backgroundColor: t.cardAlt,
                 opacity: pressed ? 0.7 : 1,
               })}
@@ -139,6 +183,8 @@ export function SelectModal({
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: t.card,
+                  borderWidth: StyleSheet.hairlineWidth,
+                  borderColor: t.border,
                 }}
               >
                 <Ionicons name="close-circle-outline" size={20} color={t.textMuted} />
@@ -157,6 +203,7 @@ export function SelectModal({
               <Pressable
                 key={o.id}
                 onPress={() => {
+                  selectionFeedback();
                   onSelect(o.id);
                   onClose();
                 }}
@@ -164,7 +211,9 @@ export function SelectModal({
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: Spacing.md,
-                  padding: Spacing.md,
+                  paddingHorizontal: Spacing.md,
+                  paddingVertical: Spacing.sm,
+                  minHeight: 60,
                   borderRadius: Radius.md,
                   borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
                   borderColor: selected ? tint : t.border,
@@ -181,6 +230,8 @@ export function SelectModal({
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: hexToRgba(tint, selected ? 0.2 : 0.14),
+                      borderWidth: StyleSheet.hairlineWidth,
+                      borderColor: hexToRgba(tint, selected ? 0.32 : 0.16),
                     }}
                   >
                     <Ionicons name={icon} size={20} color={tint} />
@@ -201,20 +252,56 @@ export function SelectModal({
             );
           })}
           {filtered.length === 0 ? (
-            <Text variant="caption" color={t.textMuted} style={{ paddingVertical: Spacing.lg, textAlign: 'center' }}>
-              No matches
-            </Text>
+            <View style={{ alignItems: 'center', paddingVertical: Spacing.xl, gap: Spacing.sm }}>
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: Radius.pill,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: hexToRgba(accent, 0.1),
+                  marginBottom: Spacing.xs,
+                }}
+              >
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: Radius.pill,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: hexToRgba(accent, 0.16),
+                  }}
+                >
+                  <Ionicons name="search-outline" size={22} color={accent} />
+                </View>
+              </View>
+              <Text variant="subtitle">No matches</Text>
+              <Text variant="caption" color={t.textMuted} style={{ textAlign: 'center' }}>
+                Try a different search
+              </Text>
+            </View>
           ) : null}
         </ScrollView>
         {footerLabel && onFooter ? (
-          <Button
-            title={footerLabel}
-            icon="add"
-            variant="secondary"
-            onPress={() => {
-              onFooter();
-            }}
-          />
+          <>
+            <View
+              style={{
+                height: StyleSheet.hairlineWidth,
+                backgroundColor: t.border,
+                marginHorizontal: -Spacing.lg,
+              }}
+            />
+            <Button
+              title={footerLabel}
+              icon="add"
+              variant="secondary"
+              onPress={() => {
+                onFooter();
+              }}
+            />
+          </>
         ) : null}
       </Animated.View>
     </Modal>
@@ -239,17 +326,18 @@ export function SelectField({
       {label ? <Text variant="label" color={t.textSecondary}>{label}</Text> : null}
       <Pressable
         onPress={onPress}
-        style={{
+        style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
           backgroundColor: t.inputBg,
           borderRadius: Radius.md,
-          borderWidth: 1,
+          borderWidth: 1.5,
           borderColor: t.border,
           paddingHorizontal: Spacing.md,
-          height: 48,
-        }}
+          minHeight: 50,
+          opacity: pressed ? 0.7 : 1,
+        })}
       >
         <Text variant="body" color={value ? t.text : t.textMuted}>{value || placeholder}</Text>
         <Ionicons name="chevron-down" size={18} color={t.textMuted} />
@@ -303,17 +391,18 @@ export function DateTimeField({
       {label ? <Text variant="label" color={t.textSecondary}>{label}</Text> : null}
       <Pressable
         onPress={open}
-        style={{
+        style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
           backgroundColor: t.inputBg,
           borderRadius: Radius.md,
-          borderWidth: 1,
+          borderWidth: 1.5,
           borderColor: t.border,
           paddingHorizontal: Spacing.md,
-          height: 48,
-        }}
+          minHeight: 50,
+          opacity: pressed ? 0.7 : 1,
+        })}
       >
         <Text variant="body">{mode === 'datetime' ? formatDateTime(value.toISOString()) : formatDate(value.toISOString())}</Text>
         <Ionicons name="calendar-outline" size={18} color={t.textMuted} />

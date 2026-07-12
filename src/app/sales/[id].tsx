@@ -20,7 +20,7 @@ export default function SaleDetail() {
   const saleId = Number(id);
   const [sharing, setSharing] = useState(false);
 
-  const { data } = useAsyncData(async () => {
+  const { data, loading } = useAsyncData(async () => {
     const sale = await getSale(saleId);
     if (!sale) return null;
     const items = await getSaleItems(saleId);
@@ -43,6 +43,7 @@ export default function SaleDetail() {
   };
 
   if (!data?.sale) {
+    if (loading) return null;
     return (
       <Screen>
         <AppHeader title="Sale" back />

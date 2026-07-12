@@ -22,14 +22,15 @@ export default function OrderDetail() {
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
 
-  const { data, reload } = useAsyncData(async () => {
+  const { data, loading, reload } = useAsyncData(async () => {
     const order = await getOrder(orderId);
     if (!order) return null;
     const items = await getOrderItems(orderId);
     return { order, items };
   }, [orderId]);
 
-  if (data === null) {
+  if (!data) {
+    if (loading) return null;
     return (
       <Screen>
         <AppHeader title={terms.order} back />
@@ -37,7 +38,6 @@ export default function OrderDetail() {
       </Screen>
     );
   }
-  if (!data) return null;
   if (editing) return <OrderForm initial={data.order} onDone={() => { setEditing(false); reload(); }} />;
 
   const { order, items } = data;

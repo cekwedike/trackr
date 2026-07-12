@@ -43,7 +43,7 @@ export default function NoteEditor() {
 
   const tokens = useNoteColorTokens(color);
 
-  const { data, reload } = useAsyncData(async () => {
+  const { data, loading, reload } = useAsyncData(async () => {
     const note = await getNote(noteId);
     if (!note) return null;
     const outgoing = await getOutgoingLinks(noteId);
@@ -101,7 +101,8 @@ export default function NoteEditor() {
     reload();
   };
 
-  if (data === null) {
+  if (!data) {
+    if (loading) return null;
     return (
       <Screen>
         <AppHeader title="Note" back />

@@ -22,7 +22,7 @@ export default function RecipeDetail() {
   const [editing, setEditing] = useState(false);
   const [margin, setMargin] = useState('40');
 
-  const { data, reload } = useAsyncData(async () => {
+  const { data, loading, reload } = useAsyncData(async () => {
     const recipe = await getRecipe(recipeId);
     if (!recipe) return null;
     const items = await getRecipeItems(recipeId);
@@ -42,7 +42,8 @@ export default function RecipeDetail() {
   const marginPct = Math.min(95, Math.max(0, parseFloat(margin) || 0));
   const suggested = marginPct < 100 ? Math.round(perUnit / (1 - marginPct / 100)) : perUnit;
 
-  if (data === null) {
+  if (!data) {
+    if (loading) return null;
     return (
       <Screen>
         <AppHeader title="Recipe" back />
@@ -50,7 +51,6 @@ export default function RecipeDetail() {
       </Screen>
     );
   }
-  if (!data) return null;
 
   if (editing) {
     return <RecipeForm initial={data.recipe} onDone={() => { setEditing(false); reload(); }} />;
