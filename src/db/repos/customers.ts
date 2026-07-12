@@ -75,6 +75,30 @@ export async function deleteCustomer(id: number): Promise<void> {
   await db.runAsync('DELETE FROM customers WHERE id = ?', [id]);
 }
 
+/** Lightweight row for global search results. */
+export interface CustomerSearchRow {
+  id: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  debt_balance: number;
+}
+
+/** Case-insensitive LIKE search over a customer's name, phone, email, address and note. */
+export async function searchCustomers(q: string, limit = 20): Promise<CustomerSearchRow[]> {
+  const term = q.trim();
+  if (!term) return [];
+  const db = await getDb();
+  const like = `%${term}%`;
+  return db.getAllAsync<CustomerSearchRow>(
+    `SELECT id, name, phone, email, debt_balance
+     FROM customers
+     WHERE name LIKE ? OR phone LIKE ? OR email LIKE ? OR address LIKE ? OR note LIKE ?
+     ORDER BY name COLLATE NOCASE ASC LIMIT ?`,
+    [like, like, like, like, like, limit],
+  );
+}
+
 export async function totalDebts(): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ total: number }>(

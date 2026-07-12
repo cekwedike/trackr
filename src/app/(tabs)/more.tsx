@@ -51,6 +51,7 @@ export default function More() {
     g.push({
       title: 'Productivity',
       items: [
+        { icon: 'search', tone: 'accent', title: 'Search', subtitle: `Find ${terms.sales.toLowerCase()}, ${terms.customers.toLowerCase()}, notes & more`, href: '/search' },
         { icon: 'document-text', tone: 'info', title: 'Notes', subtitle: 'Jot down ideas & to-dos', href: '/notes' },
         { icon: 'alarm', tone: 'primary', title: 'Reminders', subtitle: 'Never forget a task', href: '/reminders' },
       ],

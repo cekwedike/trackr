@@ -56,6 +56,30 @@ export async function deleteExpense(id: number): Promise<void> {
   await db.runAsync('DELETE FROM expenses WHERE id = ?', [id]);
 }
 
+/** Lightweight row for global search results. */
+export interface ExpenseSearchRow {
+  id: number;
+  occurred_at: string;
+  amount: number;
+  description: string | null;
+  category: string | null;
+}
+
+/** Case-insensitive LIKE search over an expense's description, category and payment method. */
+export async function searchExpenses(q: string, limit = 20): Promise<ExpenseSearchRow[]> {
+  const term = q.trim();
+  if (!term) return [];
+  const db = await getDb();
+  const like = `%${term}%`;
+  return db.getAllAsync<ExpenseSearchRow>(
+    `SELECT id, occurred_at, amount, description, category
+     FROM expenses
+     WHERE description LIKE ? OR category LIKE ? OR payment_method LIKE ?
+     ORDER BY occurred_at DESC LIMIT ?`,
+    [like, like, like, limit],
+  );
+}
+
 export async function sumExpenses(start: string, end: string): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ total: number }>(

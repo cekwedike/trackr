@@ -117,6 +117,30 @@ export async function deleteOrder(id: number): Promise<void> {
   await db.runAsync('DELETE FROM orders WHERE id = ?', [id]);
 }
 
+/** Lightweight row for global search results. */
+export interface OrderSearchRow {
+  id: number;
+  customer_name: string | null;
+  status: OrderStatus;
+  total: number;
+  due_at: string | null;
+}
+
+/** Case-insensitive LIKE search over an order's customer name, note and status. */
+export async function searchOrders(q: string, limit = 20): Promise<OrderSearchRow[]> {
+  const term = q.trim();
+  if (!term) return [];
+  const db = await getDb();
+  const like = `%${term}%`;
+  return db.getAllAsync<OrderSearchRow>(
+    `SELECT id, customer_name, status, total, due_at
+     FROM orders
+     WHERE customer_name LIKE ? OR note LIKE ? OR status LIKE ?
+     ORDER BY created_at DESC LIMIT ?`,
+    [like, like, like, limit],
+  );
+}
+
 export async function countActiveOrders(): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ c: number }>(

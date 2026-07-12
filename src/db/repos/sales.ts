@@ -95,6 +95,30 @@ export async function deleteSale(id: number): Promise<void> {
   await db.runAsync('DELETE FROM sales WHERE id = ?', [id]);
 }
 
+/** Lightweight row for global search results. */
+export interface SaleSearchRow {
+  id: number;
+  occurred_at: string;
+  total: number;
+  customer_name: string | null;
+  note: string | null;
+}
+
+/** Case-insensitive LIKE search over a sale's note and its customer's name. */
+export async function searchSales(q: string, limit = 20): Promise<SaleSearchRow[]> {
+  const term = q.trim();
+  if (!term) return [];
+  const db = await getDb();
+  const like = `%${term}%`;
+  return db.getAllAsync<SaleSearchRow>(
+    `SELECT s.id, s.occurred_at, s.total, s.note, c.name AS customer_name
+     FROM sales s LEFT JOIN customers c ON c.id = s.customer_id
+     WHERE s.note LIKE ? OR c.name LIKE ?
+     ORDER BY s.occurred_at DESC LIMIT ?`,
+    [like, like, limit],
+  );
+}
+
 /** Sum of sale totals and COGS within [start, end). */
 export async function sumSales(start: string, end: string): Promise<{ revenue: number; cogs: number; count: number }> {
   const db = await getDb();

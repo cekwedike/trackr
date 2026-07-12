@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { OrderForm } from '@/components/forms/order-form';
-import { AppHeader, Card, Chip, Divider, IconButton, Screen, SectionHeader, Segmented, Text } from '@/components/ui';
+import { AppHeader, Button, Card, Chip, Divider, IconButton, Screen, SectionHeader, Segmented, Text } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { getOrder, getOrderItems, ORDER_STATUSES, setOrderStatus } from '@/db/repos/orders';
@@ -11,13 +11,16 @@ import type { OrderStatus } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/lib/date';
+import { pressFeedback } from '@/lib/haptics';
+import { orderToReceipt, printReceipt, shareReceipt } from '@/lib/receipt';
 
 export default function OrderDetail() {
   const t = useTheme();
-  const { money, terms } = useApp();
+  const { money, terms, settings, accent, currencySymbol } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const orderId = Number(id);
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const { data, reload } = useAsyncData(async () => {
     const order = await getOrder(orderId);
@@ -43,6 +46,33 @@ export default function OrderDetail() {
   const changeStatus = async (s: OrderStatus) => {
     await setOrderStatus(orderId, s);
     reload();
+  };
+
+  const buildData = () =>
+    orderToReceipt(
+      order,
+      items,
+      {
+        businessName: settings?.business_name?.trim() || 'Trackr',
+        currencySymbol,
+        accent,
+      },
+      ORDER_STATUSES.find((s) => s.value === order.status)?.label,
+    );
+
+  const onShare = async () => {
+    pressFeedback();
+    setSharing(true);
+    try {
+      await shareReceipt(buildData());
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const onPrint = () => {
+    pressFeedback();
+    printReceipt(buildData());
   };
 
   return (
@@ -85,6 +115,11 @@ export default function OrderDetail() {
           </View>
         ))}
       </Card>
+
+      <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg }}>
+        <Button title="Send invoice" icon="share-social-outline" onPress={onShare} loading={sharing} style={{ flex: 1 }} />
+        <Button title="Print" variant="secondary" icon="print-outline" onPress={onPrint} style={{ flex: 1 }} />
+      </View>
     </Screen>
   );
 }

@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { AppHeader, Button, Card, Chip, Divider, IconButton, Screen, SectionHeader, Text } from '@/components/ui';
@@ -9,12 +10,15 @@ import { getCustomer } from '@/db/repos/customers';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateTime } from '@/lib/date';
+import { pressFeedback } from '@/lib/haptics';
+import { printReceipt, saleToReceipt, shareReceipt } from '@/lib/receipt';
 
 export default function SaleDetail() {
   const t = useTheme();
-  const { money } = useApp();
+  const { money, settings, accent, currencySymbol } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const saleId = Number(id);
+  const [sharing, setSharing] = useState(false);
 
   const { data } = useAsyncData(async () => {
     const sale = await getSale(saleId);
@@ -49,6 +53,28 @@ export default function SaleDetail() {
 
   const { sale, items, customer } = data;
   const profit = sale.total - sale.cost_total;
+
+  const buildData = () =>
+    saleToReceipt(sale, items, customer?.name, {
+      businessName: settings?.business_name?.trim() || 'Trackr',
+      currencySymbol,
+      accent,
+    });
+
+  const onShare = async () => {
+    pressFeedback();
+    setSharing(true);
+    try {
+      await shareReceipt(buildData());
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const onPrint = () => {
+    pressFeedback();
+    printReceipt(buildData());
+  };
 
   return (
     <Screen>
@@ -87,7 +113,12 @@ export default function SaleDetail() {
         ))}
       </Card>
 
-      <Button title="Done" variant="ghost" onPress={() => router.back()} style={{ marginTop: Spacing.lg }} />
+      <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg }}>
+        <Button title="Share receipt" icon="share-social-outline" onPress={onShare} loading={sharing} style={{ flex: 1 }} />
+        <Button title="Print" variant="secondary" icon="print-outline" onPress={onPrint} style={{ flex: 1 }} />
+      </View>
+
+      <Button title="Done" variant="ghost" onPress={() => router.back()} style={{ marginTop: Spacing.sm }} />
     </Screen>
   );
 }

@@ -86,6 +86,32 @@ export async function adjustProductStock(id: number, delta: number, reason: stri
   );
 }
 
+/** Lightweight row for global search results. */
+export interface ProductSearchRow {
+  id: number;
+  name: string;
+  category: string | null;
+  sku: string | null;
+  price: number;
+  stock: number;
+  unit: string;
+}
+
+/** Case-insensitive LIKE search over an active product's name, category, SKU and notes. */
+export async function searchProducts(q: string, limit = 20): Promise<ProductSearchRow[]> {
+  const term = q.trim();
+  if (!term) return [];
+  const db = await getDb();
+  const like = `%${term}%`;
+  return db.getAllAsync<ProductSearchRow>(
+    `SELECT id, name, category, sku, price, stock, unit
+     FROM products
+     WHERE is_active = 1 AND (name LIKE ? OR category LIKE ? OR sku LIKE ? OR notes LIKE ?)
+     ORDER BY name COLLATE NOCASE ASC LIMIT ?`,
+    [like, like, like, like, limit],
+  );
+}
+
 export async function listLowStockProducts(): Promise<Product[]> {
   const db = await getDb();
   return db.getAllAsync<Product>(

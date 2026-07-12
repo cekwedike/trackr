@@ -34,6 +34,27 @@ export async function listNotes(search = ''): Promise<Note[]> {
   return db.getAllAsync<Note>('SELECT * FROM notes ORDER BY pinned DESC, updated_at DESC');
 }
 
+/** Lightweight row for global search results. */
+export interface NoteSearchRow {
+  id: number;
+  title: string;
+  body: string;
+}
+
+/** Case-insensitive LIKE search over a note's title and body. */
+export async function searchNotes(q: string, limit = 20): Promise<NoteSearchRow[]> {
+  const term = q.trim();
+  if (!term) return [];
+  const db = await getDb();
+  const like = `%${term}%`;
+  return db.getAllAsync<NoteSearchRow>(
+    `SELECT id, title, body FROM notes
+     WHERE title LIKE ? OR body LIKE ?
+     ORDER BY pinned DESC, updated_at DESC LIMIT ?`,
+    [like, like, limit],
+  );
+}
+
 export async function getNote(id: number): Promise<Note | null> {
   const db = await getDb();
   return db.getFirstAsync<Note>('SELECT * FROM notes WHERE id = ?', [id]);
