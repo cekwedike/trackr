@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
-import { Button, Card, AppHeader, Screen, Text, TextField } from '@/components/ui';
+import { Button, Card, AppHeader, Screen, Text, TextField, Toggle } from '@/components/ui';
 import { DateTimeField } from '@/components/pickers';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing } from '@/constants/theme';
@@ -14,7 +14,7 @@ import { fromMinor, parseMoney } from '@/lib/money';
 
 export function CustomerForm({ initial }: { initial?: Customer }) {
   const t = useTheme();
-  const { currencySymbol } = useApp();
+  const { currencySymbol, terms } = useApp();
   const [name, setName] = useState(initial?.name ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
   const [email, setEmail] = useState(initial?.email ?? '');
@@ -27,7 +27,7 @@ export function CustomerForm({ initial }: { initial?: Customer }) {
 
   const save = async () => {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter the customer name.');
+      Alert.alert('Name required', `Please enter the ${terms.customer.toLowerCase()} name.`);
       return;
     }
     setSaving(true);
@@ -51,7 +51,7 @@ export function CustomerForm({ initial }: { initial?: Customer }) {
 
   const remove = () => {
     if (!initial) return;
-    Alert.alert('Delete customer', 'Remove this customer?', [
+    Alert.alert(`Delete ${terms.customer.toLowerCase()}`, `Remove this ${terms.customer.toLowerCase()}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => { await deleteCustomer(initial.id); router.back(); } },
     ]);
@@ -59,27 +59,27 @@ export function CustomerForm({ initial }: { initial?: Customer }) {
 
   return (
     <Screen>
-      <AppHeader title={initial ? 'Edit customer' : 'New customer'} back />
+      <AppHeader title={initial ? `Edit ${terms.customer.toLowerCase()}` : `New ${terms.customer.toLowerCase()}`} back />
       <Card style={{ gap: Spacing.md }}>
         <TextField label="Name" value={name} onChangeText={setName} placeholder="Full name" autoFocus={!initial} />
         <TextField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="080..." />
         <TextField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="Optional" />
         <TextField label="Address" value={address} onChangeText={setAddress} placeholder="Optional" />
 
-        <Pressable onPress={() => setHasBirthday((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
             <Ionicons name="gift-outline" size={18} color={t.textSecondary} />
             <Text variant="body">Birthday</Text>
           </View>
-          <Ionicons name={hasBirthday ? 'toggle' : 'toggle-outline'} size={32} color={hasBirthday ? t.primary : t.textMuted} />
-        </Pressable>
+          <Toggle value={hasBirthday} onValueChange={setHasBirthday} />
+        </View>
         {hasBirthday ? <DateTimeField value={birthday} onChange={setBirthday} mode="date" /> : null}
 
         <TextField label="Outstanding debt (owed to you)" value={debt} onChangeText={setDebt} keyboardType="numeric" prefix={currencySymbol} />
         <TextField label="Note" value={note} onChangeText={setNote} placeholder="Preferences, etc." multiline />
       </Card>
 
-      <Button title={initial ? 'Save changes' : 'Add customer'} icon="checkmark" onPress={save} loading={saving} size="lg" style={{ marginTop: Spacing.lg }} />
+      <Button title={initial ? 'Save changes' : `Add ${terms.customer.toLowerCase()}`} icon="checkmark" onPress={save} loading={saving} size="lg" style={{ marginTop: Spacing.lg }} />
       {initial ? <Button title="Delete" variant="danger" onPress={remove} style={{ marginTop: Spacing.md }} /> : null}
     </Screen>
   );

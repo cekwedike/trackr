@@ -14,7 +14,7 @@ import { formatDate } from '@/lib/date';
 
 export default function OrderDetail() {
   const t = useTheme();
-  const { money } = useApp();
+  const { money, terms } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const orderId = Number(id);
   const [editing, setEditing] = useState(false);
@@ -29,8 +29,8 @@ export default function OrderDetail() {
   if (data === null) {
     return (
       <Screen>
-        <AppHeader title="Order" back />
-        <Text variant="body">Order not found.</Text>
+        <AppHeader title={terms.order} back />
+        <Text variant="body">{terms.order} not found.</Text>
       </Screen>
     );
   }
@@ -47,7 +47,7 @@ export default function OrderDetail() {
 
   return (
     <Screen>
-      <AppHeader title={order.customer_name || `Order #${order.id}`} back right={<IconButton icon="create-outline" tone="primary" onPress={() => setEditing(true)} />} />
+      <AppHeader title={order.customer_name || `${terms.order} #${order.id}`} back right={<IconButton icon="create-outline" tone="primary" onPress={() => setEditing(true)} />} />
 
       <SectionHeader title="Status" />
       <View style={{ marginBottom: Spacing.lg }}>

@@ -3,10 +3,15 @@ import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
-import { AppHeader, Card, IconButton, Screen, SectionHeader, Text, TextField } from '@/components/ui';
-import type { IconName } from '@/components/ui';
+import { ColorPicker } from '@/components/notes/color-picker';
+import { ENTITY_ROUTE, entityMeta } from '@/components/notes/entities';
+import { useNoteColorTokens } from '@/components/notes/palette';
 import { SelectModal, type SelectOption } from '@/components/pickers';
+import { AppHeader, Card, IconButton, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
+import { listCustomers } from '@/db/repos/customers';
+import { listOrders } from '@/db/repos/orders';
+import { listProducts } from '@/db/repos/products';
 import {
   addEntityLink,
   deleteNote,
@@ -16,24 +21,9 @@ import {
   togglePinned,
   updateNote,
 } from '@/db/repos/notes';
-import { listCustomers } from '@/db/repos/customers';
-import { listProducts } from '@/db/repos/products';
-import { listOrders } from '@/db/repos/orders';
 import type { LinkTargetType } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
-
-const ENTITY_ROUTE: Record<string, string> = {
-  product: '/products',
-  customer: '/customers',
-  order: '/orders',
-};
-
-const ENTITY_META: Record<string, { icon: IconName; label: string }> = {
-  product: { icon: 'cube', label: 'Product' },
-  customer: { icon: 'person', label: 'Customer' },
-  order: { icon: 'clipboard', label: 'Order' },
-};
 
 export default function NoteEditor() {
   const t = useTheme();
@@ -43,12 +33,15 @@ export default function NoteEditor() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [pinned, setPinned] = useState(false);
+  const [color, setColor] = useState<string | null>(null);
   const loadedFor = useRef<number | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [typeModal, setTypeModal] = useState(false);
   const [entityModal, setEntityModal] = useState<LinkTargetType | null>(null);
   const [entityOptions, setEntityOptions] = useState<SelectOption[]>([]);
+
+  const tokens = useNoteColorTokens(color);
 
   const { data, reload } = useAsyncData(async () => {
     const note = await getNote(noteId);
@@ -62,6 +55,7 @@ export default function NoteEditor() {
       setTitle(data.note.title);
       setBody(data.note.body);
       setPinned(data.note.pinned === 1);
+      setColor(data.note.color);
       loadedFor.current = data.note.id;
     }
   }, [data]);
@@ -70,14 +64,14 @@ export default function NoteEditor() {
     if (loadedFor.current !== noteId) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await updateNote(noteId, { title: title || 'Untitled', body, pinned: pinned ? 1 : 0 });
+      await updateNote(noteId, { title: title || 'Untitled', body, pinned: pinned ? 1 : 0, color });
       reload();
     }, 600);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, body, pinned]);
+  }, [title, body, pinned, color]);
 
   const remove = () => {
     Alert.alert('Delete note', 'This note will be permanently deleted.', [
@@ -119,7 +113,7 @@ export default function NoteEditor() {
   const attached = data?.outgoing.filter((l) => l.target_type !== 'note') ?? [];
 
   return (
-    <Screen>
+    <Screen style={{ backgroundColor: tokens.isDefault ? t.background : tokens.bg }}>
       <AppHeader
         title="Note"
         back
@@ -127,7 +121,7 @@ export default function NoteEditor() {
           <View style={{ flexDirection: 'row' }}>
             <IconButton
               icon={pinned ? 'bookmark' : 'bookmark-outline'}
-              tone={pinned ? 'warning' : undefined}
+              color={pinned ? tokens.accent : undefined}
               onPress={() => { setPinned((v) => !v); togglePinned(noteId, !pinned); }}
             />
             <IconButton icon="trash-outline" tone="danger" onPress={remove} />
@@ -135,7 +129,7 @@ export default function NoteEditor() {
         }
       />
 
-      <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
+      <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg, backgroundColor: tokens.bg, borderColor: tokens.border }}>
         <TextField value={title} onChangeText={setTitle} placeholder="Note title" />
         <TextField
           value={body}
@@ -145,6 +139,11 @@ export default function NoteEditor() {
           style={{ minHeight: 220 }}
         />
         <Text variant="caption" color={t.textMuted}>Saved automatically</Text>
+      </Card>
+
+      <SectionHeader title="Color theme" />
+      <Card style={{ marginBottom: Spacing.lg }}>
+        <ColorPicker value={color} onChange={setColor} />
       </Card>
 
       <SectionHeader title="Attached to" action="Attach" onAction={() => setTypeModal(true)} />
@@ -159,7 +158,7 @@ export default function NoteEditor() {
           </Pressable>
         ) : (
           attached.map((l) => {
-            const meta = ENTITY_META[l.target_type] ?? { icon: 'link' as IconName, label: l.target_type };
+            const meta = entityMeta(l.target_type);
             return (
               <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
                 <Pressable

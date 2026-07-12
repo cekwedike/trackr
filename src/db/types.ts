@@ -144,6 +144,7 @@ export interface Note {
   title: string;
   body: string;
   pinned: number;
+  color: string | null;
   created_at: string;
   updated_at: string;
 }

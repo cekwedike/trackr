@@ -1,11 +1,14 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
-import { AppHeader, Card, Chip, EmptyState, FAB, ListRow, Screen, Text } from '@/components/ui';
+import { FadeSlide, SkeletonList } from '@/components/anim';
+import { MovableFab } from '@/components/nav';
+import { AppHeader, Card, Chip, EmptyState, ListRow, Screen, Text } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listSales } from '@/db/repos/sales';
 import { useAsyncData } from '@/hooks/use-async-data';
+import { useFabActions } from '@/hooks/use-fab-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateTime } from '@/lib/date';
 
@@ -20,23 +23,26 @@ const METHOD_LABEL: Record<string, string> = {
 
 export default function SalesScreen() {
   const t = useTheme();
-  const { money } = useApp();
+  const { money, terms } = useApp();
   const { data } = useAsyncData(() => listSales(), []);
+  const fabActions = useFabActions(['sale', 'expense', 'customer']);
 
   const total = (data ?? []).reduce((s, x) => s + x.total, 0);
 
   return (
     <>
       <Screen>
-        <AppHeader title="Sales" subtitle={data ? `${data.length} recorded · ${money(total)}` : undefined} />
-        {data && data.length > 0 ? (
+        <AppHeader title={terms.sales} subtitle={data ? `${data.length} recorded · ${money(total)}` : undefined} />
+        {!data ? (
+          <SkeletonList rows={7} />
+        ) : data.length > 0 ? (
           <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
             {data.map((s, idx) => (
-              <View key={s.id}>
+              <FadeSlide key={s.id} delay={Math.min(idx * 45, 360)}>
                 <ListRow
                   icon="cart"
                   iconTone="success"
-                  title={s.customer_name ? `${s.customer_name}` : `Sale #${s.id}`}
+                  title={s.customer_name ? `${s.customer_name}` : `${terms.sale} #${s.id}`}
                   subtitle={`${formatDateTime(s.occurred_at)} · ${s.item_count} item(s)`}
                   onPress={() => router.push(`/sales/${s.id}`)}
                   right={
@@ -47,20 +53,20 @@ export default function SalesScreen() {
                   }
                 />
                 {idx < data.length - 1 ? <View style={{ height: 1, backgroundColor: t.border }} /> : null}
-              </View>
+              </FadeSlide>
             ))}
           </Card>
         ) : (
           <EmptyState
             icon="cart-outline"
-            title="No sales yet"
-            message="Record your first sale to start tracking revenue."
-            actionLabel="Record a sale"
+            title={`No ${terms.sales.toLowerCase()} yet`}
+            message={`Record your first ${terms.sale.toLowerCase()} to start tracking revenue.`}
+            actionLabel={`Record a ${terms.sale.toLowerCase()}`}
             onAction={() => router.push('/sales/new')}
           />
         )}
       </Screen>
-      <FAB label="Sale" onPress={() => router.push('/sales/new')} />
+      <MovableFab actions={fabActions} storageKey="sales" />
     </>
   );
 }

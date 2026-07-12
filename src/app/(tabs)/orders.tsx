@@ -2,12 +2,15 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { AppHeader, Card, Chip, EmptyState, FAB, ListRow, Screen, Segmented } from '@/components/ui';
+import { FadeSlide, SkeletonList } from '@/components/anim';
+import { MovableFab } from '@/components/nav';
+import { AppHeader, Card, Chip, EmptyState, ListRow, Screen, Segmented } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listOrders } from '@/db/repos/orders';
 import type { OrderStatus } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
+import { useFabActions } from '@/hooks/use-fab-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/lib/date';
 
@@ -28,43 +31,52 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 
 export default function OrdersScreen() {
   const t = useTheme();
-  const { money } = useApp();
+  const { money, terms } = useApp();
   const [filter, setFilter] = useState<'active' | 'all'>('active');
   const { data } = useAsyncData(() => listOrders(), []);
+  const fabActions = useFabActions(['order', 'customer', 'expense']);
 
   const orders = (data ?? []).filter((o) => (filter === 'active' ? o.status !== 'delivered' && o.status !== 'cancelled' : true));
 
   return (
     <>
       <Screen>
-        <AppHeader title="Orders" back />
+        <AppHeader title={terms.orders} subtitle={data ? `${data.length} total` : undefined} />
         <View style={{ marginBottom: Spacing.lg }}>
           <Segmented value={filter} onChange={setFilter} options={[{ value: 'active', label: 'Active' }, { value: 'all', label: 'All' }]} />
         </View>
-        {orders.length > 0 ? (
+        {!data ? (
+          <SkeletonList rows={6} />
+        ) : orders.length > 0 ? (
           <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
             {orders.map((o, idx) => {
               const balance = o.total - o.amount_paid;
               return (
-                <View key={o.id}>
+                <FadeSlide key={o.id} delay={Math.min(idx * 45, 360)}>
                   <ListRow
                     icon="clipboard"
                     iconTone={STATUS_TONE[o.status]}
-                    title={o.customer_name || `Order #${o.id}`}
+                    title={o.customer_name || `${terms.order} #${o.id}`}
                     subtitle={`${money(o.total)}${balance > 0 ? ` · ${money(balance)} due` : ' · paid'}${o.due_at ? ` · due ${formatDate(o.due_at)}` : ''}`}
                     onPress={() => router.push(`/orders/${o.id}`)}
                     right={<Chip label={STATUS_LABEL[o.status]} tone={STATUS_TONE[o.status]} />}
                   />
                   {idx < orders.length - 1 ? <View style={{ height: 1, backgroundColor: t.border }} /> : null}
-                </View>
+                </FadeSlide>
               );
             })}
           </Card>
         ) : (
-          <EmptyState icon="clipboard-outline" title="No orders" message="Track customer orders from request to delivery." actionLabel="New order" onAction={() => router.push('/orders/new')} />
+          <EmptyState
+            icon="clipboard-outline"
+            title={`No ${terms.orders.toLowerCase()}`}
+            message={`Track ${terms.customer.toLowerCase()} ${terms.orders.toLowerCase()} from request to delivery.`}
+            actionLabel={`New ${terms.order.toLowerCase()}`}
+            onAction={() => router.push('/orders/new')}
+          />
         )}
       </Screen>
-      <FAB label="Order" onPress={() => router.push('/orders/new')} />
+      <MovableFab actions={fabActions} storageKey="orders" />
     </>
   );
 }

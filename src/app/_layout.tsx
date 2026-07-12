@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Image } from 'expo-image';
@@ -25,13 +26,25 @@ import { useThemeName } from '@/hooks/use-theme';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function BrandLoading() {
+  const reduced = useReducedMotion();
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) return;
+    pulse.value = withRepeat(withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.quad) }), -1, true);
+  }, [pulse, reduced]);
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + pulse.value * 0.06 }],
+    opacity: 0.85 + pulse.value * 0.15,
+  }));
   return (
     <View style={{ flex: 1, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', gap: Spacing.xxl }}>
-      <Image
-        source={require('../../assets/images/splash-icon.png')}
-        style={{ width: 180, height: 180 }}
-        contentFit="contain"
-      />
+      <Animated.View style={logoStyle}>
+        <Image
+          source={require('../../assets/images/splash-icon.png')}
+          style={{ width: 180, height: 180 }}
+          contentFit="contain"
+        />
+      </Animated.View>
       <ActivityIndicator size="large" color="#FFFFFF" />
     </View>
   );
@@ -51,6 +64,7 @@ function RootNavigator() {
   const { settings, locked } = useApp();
   const router = useRouter();
   const pathname = usePathname();
+  const c = Colors[useThemeName()];
 
   useEffect(() => {
     if (!settings) return;
@@ -69,7 +83,15 @@ function RootNavigator() {
   }, [settings, locked, pathname, router]);
 
   return (
-    <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right',
+        animationDuration: 260,
+        gestureEnabled: true,
+        contentStyle: { backgroundColor: c.background },
+      }}
+    >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
       <Stack.Screen name="lock" options={{ animation: 'fade', gestureEnabled: false }} />

@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { Aurora, FadeSlide } from '@/components/anim';
+import { AnimatedGrid } from '@/components/nav';
 import { Brand, Button, Card, Screen, Text, TextField, Toggle } from '@/components/ui';
 import { CURRENCIES } from '@/constants/currencies';
 import { getIndustry, INDUSTRIES } from '@/constants/industries';
@@ -11,6 +13,7 @@ import { updateSettings } from '@/db/repos/settings';
 import { useTheme } from '@/hooks/use-theme';
 import { isBiometricAvailable, setPin } from '@/lib/auth';
 import { hexToRgba } from '@/lib/color';
+import { successFeedback } from '@/lib/haptics';
 
 export default function Onboarding() {
   const t = useTheme();
@@ -53,6 +56,7 @@ export default function Onboarding() {
         onboarded: 1,
       });
       await reloadSettings();
+      successFeedback();
       unlock();
     } finally {
       setSaving(false);
@@ -65,11 +69,15 @@ export default function Onboarding() {
 
   return (
     <Screen scroll>
-      <View style={{ alignItems: 'center', marginTop: Spacing.xl, marginBottom: Spacing.xl }}>
-        <Brand size={76} showWordmark subtitle="Your business, in your pocket" />
+      <View style={{ overflow: 'hidden', borderRadius: Radius.xl, marginTop: Spacing.xl, marginBottom: Spacing.xl }}>
+        <Aurora colors={[t.primary, t.accent, t.info]} opacity={0.4} />
+        <View style={{ alignItems: 'center', paddingVertical: Spacing.xl }}>
+          <Brand size={76} showWordmark subtitle="Your business, in your pocket" />
+        </View>
       </View>
 
       {step === 0 ? (
+        <FadeSlide key="s0">
         <Card style={{ gap: Spacing.lg }}>
           <Text variant="subtitle">Let&apos;s set up your business</Text>
           <Text variant="body" color={t.textSecondary}>
@@ -78,53 +86,58 @@ export default function Onboarding() {
           <TextField label="Business name" value={name} onChangeText={setName} placeholder="e.g. Thrive Bakery" autoFocus />
           <Button title="Continue" icon="arrow-forward" onPress={() => setStep(1)} />
         </Card>
+        </FadeSlide>
       ) : null}
 
       {step === 1 ? (
+        <FadeSlide key="s1">
         <Card style={{ gap: Spacing.md }}>
           <Text variant="subtitle">What do you do?</Text>
           <Text variant="body" color={t.textSecondary}>
             Pick the closest fit — this tailors your dashboard, terminology and profit template. You can change it anytime.
           </Text>
           <TextField value={industryQuery} onChangeText={setIndustryQuery} placeholder="Search industries" />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
-            {filteredIndustries.map((ind) => {
-              const active = ind.id === industryId;
-              return (
-                <Pressable
-                  key={ind.id}
-                  onPress={() => setIndustryId(ind.id)}
-                  style={{
-                    flexBasis: '47%',
-                    flexGrow: 1,
-                    padding: Spacing.md,
-                    borderRadius: Radius.md,
-                    borderWidth: 1.5,
-                    borderColor: active ? ind.accent : t.border,
-                    backgroundColor: active ? hexToRgba(ind.accent, 0.1) : t.card,
-                    gap: Spacing.xs,
-                  }}
-                >
-                  <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: hexToRgba(ind.accent, 0.16), alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name={ind.icon} size={20} color={ind.accent} />
-                  </View>
-                  <Text variant="body" weight="semibold" numberOfLines={1}>{ind.name}</Text>
-                  <Text variant="caption" color={t.textSecondary} numberOfLines={1}>{ind.tagline}</Text>
-                </Pressable>
-              );
-            })}
-            {filteredIndustries.length === 0 ? (
-              <Text variant="caption" color={t.textSecondary}>No match. Try another word or pick “General”.</Text>
-            ) : null}
-          </View>
+          {filteredIndustries.length === 0 ? (
+            <Text variant="caption" color={t.textSecondary}>No match. Try another word or pick “General”.</Text>
+          ) : (
+            <AnimatedGrid
+              data={filteredIndustries}
+              columns={2}
+              keyExtractor={(ind) => ind.id}
+              renderItem={(ind) => {
+                const active = ind.id === industryId;
+                return (
+                  <Pressable
+                    onPress={() => setIndustryId(ind.id)}
+                    style={{
+                      padding: Spacing.md,
+                      borderRadius: Radius.md,
+                      borderWidth: 1.5,
+                      borderColor: active ? ind.accent : t.border,
+                      backgroundColor: active ? hexToRgba(ind.accent, 0.1) : t.card,
+                      gap: Spacing.xs,
+                    }}
+                  >
+                    <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: hexToRgba(ind.accent, 0.16), alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={ind.icon} size={20} color={ind.accent} />
+                    </View>
+                    <Text variant="body" weight="semibold" numberOfLines={1}>{ind.name}</Text>
+                    <Text variant="caption" color={t.textSecondary} numberOfLines={1}>{ind.tagline}</Text>
+                  </Pressable>
+                );
+              }}
+            />
+          )}
           <View style={{ flexDirection: 'row', gap: Spacing.md }}>
             <Button title="Back" variant="ghost" onPress={() => setStep(0)} style={{ flex: 1 }} />
             <Button title="Continue" icon="arrow-forward" onPress={() => setStep(2)} style={{ flex: 1 }} />
           </View>
         </Card>
+        </FadeSlide>
       ) : null}
 
       {step === 2 ? (
+        <FadeSlide key="s2">
         <Card style={{ gap: Spacing.md }}>
           <Text variant="subtitle">Choose your currency</Text>
           <View style={{ gap: Spacing.sm }}>
@@ -162,9 +175,11 @@ export default function Onboarding() {
             <Button title="Continue" icon="arrow-forward" onPress={() => setStep(3)} style={{ flex: 1 }} />
           </View>
         </Card>
+        </FadeSlide>
       ) : null}
 
       {step === 3 ? (
+        <FadeSlide key="s3">
         <Card style={{ gap: Spacing.lg }}>
           <Text variant="subtitle">Secure your data</Text>
           <Text variant="body" color={t.textSecondary}>
@@ -226,6 +241,7 @@ export default function Onboarding() {
             <Button title="Finish" icon="checkmark" onPress={finish} loading={saving} style={{ flex: 1 }} />
           </View>
         </Card>
+        </FadeSlide>
       ) : null}
     </Screen>
   );

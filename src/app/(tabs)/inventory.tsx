@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
-import { AppHeader, Card, Chip, EmptyState, FAB, ListRow, Screen, Segmented, Text } from '@/components/ui';
+import { FadeSlide, SkeletonList } from '@/components/anim';
+import { MovableFab, type FabAction } from '@/components/nav';
+import { AppHeader, Card, Chip, EmptyState, ListRow, Screen, Segmented } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listIngredients } from '@/db/repos/ingredients';
@@ -16,8 +18,18 @@ type Tab = 'products' | 'ingredients' | 'recipes';
 
 export default function Inventory() {
   const t = useTheme();
-  const { money } = useApp();
+  const { money, terms, industry } = useApp();
+  const { modules } = industry;
+
+  const tabs = useMemo(() => {
+    const list: { value: Tab; label: string }[] = [{ value: 'products', label: terms.items }];
+    if (modules.ingredients) list.push({ value: 'ingredients', label: terms.ingredients });
+    if (modules.recipes) list.push({ value: 'recipes', label: terms.productionLabel });
+    return list;
+  }, [modules.ingredients, modules.recipes, terms.items, terms.ingredients, terms.productionLabel]);
+
   const [tab, setTab] = useState<Tab>('products');
+  const activeTab: Tab = tabs.some((x) => x.value === tab) ? tab : 'products';
 
   const { data } = useAsyncData(async () => {
     const [products, ingredients, recipes] = await Promise.all([listProducts(), listIngredients(), listRecipes()]);
@@ -26,31 +38,34 @@ export default function Inventory() {
     return { products, ingredients, recipes, recipeCosts };
   }, []);
 
-  const addRoute = tab === 'products' ? '/products/new' : tab === 'ingredients' ? '/ingredients/new' : '/recipes/new';
+  const fabActions = useMemo<FabAction[]>(() => {
+    const list: FabAction[] = [
+      { key: 'product', icon: 'cube', label: `New ${terms.item.toLowerCase()}`, onPress: () => router.push('/products/new') },
+    ];
+    if (modules.ingredients) list.push({ key: 'ingredient', icon: 'flask', label: `New ${terms.ingredient.toLowerCase()}`, onPress: () => router.push('/ingredients/new') });
+    if (modules.recipes) list.push({ key: 'recipe', icon: 'reader', label: `New ${terms.productionLabel.toLowerCase().replace(/s$/, '')}`, onPress: () => router.push('/recipes/new') });
+    return list;
+  }, [modules.ingredients, modules.recipes, terms.item, terms.ingredient, terms.productionLabel]);
 
   return (
     <>
       <Screen>
-        <AppHeader title="Inventory" />
-        <View style={{ marginBottom: Spacing.lg }}>
-          <Segmented
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'products', label: 'Products' },
-              { value: 'ingredients', label: 'Ingredients' },
-              { value: 'recipes', label: 'Recipes' },
-            ]}
-          />
-        </View>
+        <AppHeader title={terms.inventoryLabel} />
+        {tabs.length > 1 ? (
+          <View style={{ marginBottom: Spacing.lg }}>
+            <Segmented value={activeTab} onChange={setTab} options={tabs} />
+          </View>
+        ) : null}
 
-        {tab === 'products' ? (
-          data && data.products.length > 0 ? (
+        {!data ? <SkeletonList rows={7} /> : null}
+
+        {data && activeTab === 'products' ? (
+          data.products.length > 0 ? (
             <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
               {data.products.map((p, idx) => {
                 const low = p.low_stock_threshold > 0 && p.stock <= p.low_stock_threshold;
                 return (
-                  <View key={p.id}>
+                  <FadeSlide key={p.id} delay={Math.min(idx * 45, 360)}>
                     <ListRow
                       icon="cube"
                       iconTone={low ? 'warning' : 'primary'}
@@ -60,22 +75,22 @@ export default function Inventory() {
                       right={low ? <Chip label="Low" tone="warning" /> : undefined}
                     />
                     {idx < data.products.length - 1 ? <View style={{ height: 1, backgroundColor: t.border }} /> : null}
-                  </View>
+                  </FadeSlide>
                 );
               })}
             </Card>
           ) : (
-            <EmptyState icon="cube-outline" title="No products" message="Add the items you sell." actionLabel="Add product" onAction={() => router.push('/products/new')} />
+            <EmptyState icon="cube-outline" title={`No ${terms.items.toLowerCase()}`} message={`Add the ${terms.items.toLowerCase()} you sell.`} actionLabel={`Add ${terms.item.toLowerCase()}`} onAction={() => router.push('/products/new')} />
           )
         ) : null}
 
-        {tab === 'ingredients' ? (
-          data && data.ingredients.length > 0 ? (
+        {data && activeTab === 'ingredients' ? (
+          data.ingredients.length > 0 ? (
             <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
               {data.ingredients.map((i, idx) => {
                 const low = i.reorder_threshold > 0 && i.qty_on_hand <= i.reorder_threshold;
                 return (
-                  <View key={i.id}>
+                  <FadeSlide key={i.id} delay={Math.min(idx * 45, 360)}>
                     <ListRow
                       icon="flask"
                       iconTone={low ? 'warning' : 'accent'}
@@ -85,20 +100,20 @@ export default function Inventory() {
                       right={low ? <Chip label="Reorder" tone="warning" /> : undefined}
                     />
                     {idx < data.ingredients.length - 1 ? <View style={{ height: 1, backgroundColor: t.border }} /> : null}
-                  </View>
+                  </FadeSlide>
                 );
               })}
             </Card>
           ) : (
-            <EmptyState icon="flask-outline" title="No ingredients" message="Track raw materials used in production." actionLabel="Add ingredient" onAction={() => router.push('/ingredients/new')} />
+            <EmptyState icon="flask-outline" title={`No ${terms.ingredients.toLowerCase()}`} message={`Track raw ${terms.ingredients.toLowerCase()} used in production.`} actionLabel={`Add ${terms.ingredient.toLowerCase()}`} onAction={() => router.push('/ingredients/new')} />
           )
         ) : null}
 
-        {tab === 'recipes' ? (
-          data && data.recipes.length > 0 ? (
+        {data && activeTab === 'recipes' ? (
+          data.recipes.length > 0 ? (
             <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
               {data.recipes.map((r, idx) => (
-                <View key={r.id}>
+                <FadeSlide key={r.id} delay={Math.min(idx * 45, 360)}>
                   <ListRow
                     icon="restaurant"
                     iconTone="info"
@@ -107,15 +122,15 @@ export default function Inventory() {
                     onPress={() => router.push(`/recipes/${r.id}`)}
                   />
                   {idx < data.recipes.length - 1 ? <View style={{ height: 1, backgroundColor: t.border }} /> : null}
-                </View>
+                </FadeSlide>
               ))}
             </Card>
           ) : (
-            <EmptyState icon="restaurant-outline" title="No recipes" message="Add recipes to calculate production cost and profit." actionLabel="Add recipe" onAction={() => router.push('/recipes/new')} />
+            <EmptyState icon="restaurant-outline" title={`No ${terms.productionLabel.toLowerCase()}`} message={`Add ${terms.productionLabel.toLowerCase()} to calculate production cost and profit.`} actionLabel={`Add ${terms.productionLabel.toLowerCase().replace(/s$/, '')}`} onAction={() => router.push('/recipes/new')} />
           )
         ) : null}
       </Screen>
-      <FAB label="Add" onPress={() => router.push(addRoute)} />
+      <MovableFab actions={fabActions} storageKey="inventory" />
     </>
   );
 }

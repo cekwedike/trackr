@@ -16,7 +16,7 @@ import { parseMoney } from '@/lib/money';
 
 export default function CustomerDetail() {
   const t = useTheme();
-  const { money } = useApp();
+  const { money, terms } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const customerId = Number(id);
   const [editing, setEditing] = useState(false);
@@ -40,8 +40,8 @@ export default function CustomerDetail() {
   if (data === null) {
     return (
       <Screen>
-        <AppHeader title="Customer" back />
-        <Text variant="body">Customer not found.</Text>
+        <AppHeader title={terms.customer} back />
+        <Text variant="body">{terms.customer} not found.</Text>
       </Screen>
     );
   }

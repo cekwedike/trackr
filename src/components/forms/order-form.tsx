@@ -26,7 +26,7 @@ const nextKey = () => `o-${counter++}`;
 
 export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () => void }) {
   const t = useTheme();
-  const { money, currencySymbol } = useApp();
+  const { money, currencySymbol, terms } = useApp();
 
   const [customerId, setCustomerId] = useState<number | null>(initial?.customer_id ?? null);
   const [customerName, setCustomerName] = useState(initial?.customer_name ?? '');
@@ -87,7 +87,7 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
 
   const remove = () => {
     if (!initial) return;
-    Alert.alert('Delete order', 'Remove this order?', [
+    Alert.alert(`Delete ${terms.order.toLowerCase()}`, `Remove this ${terms.order.toLowerCase()}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => { await deleteOrder(initial.id); router.back(); } },
     ]);
@@ -95,12 +95,12 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
 
   return (
     <Screen>
-      <AppHeader title={initial ? 'Edit order' : 'New order'} back />
+      <AppHeader title={initial ? `Edit ${terms.order.toLowerCase()}` : `New ${terms.order.toLowerCase()}`} back />
 
-      <SectionHeader title="Customer" />
+      <SectionHeader title={terms.customer} />
       <Card style={{ gap: Spacing.md }}>
-        <SelectField label="Existing customer" value={customers.find((c) => c.id === customerId)?.name} placeholder="Select or type below" onPress={() => setCustomerModal(true)} />
-        <TextField label="Or name" value={customerName} onChangeText={(v) => { setCustomerName(v); setCustomerId(null); }} placeholder="Customer name" />
+        <SelectField label={`Existing ${terms.customer.toLowerCase()}`} value={customers.find((c) => c.id === customerId)?.name} placeholder="Select or type below" onPress={() => setCustomerModal(true)} />
+        <TextField label="Or name" value={customerName} onChangeText={(v) => { setCustomerName(v); setCustomerId(null); }} placeholder={`${terms.customer} name`} />
       </Card>
 
       <SectionHeader title="Items" action="Custom item" onAction={addCustom} />
@@ -137,7 +137,7 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text variant="body" color={t.textSecondary}>Balance</Text><Text variant="subtitle" color={balance > 0 ? t.warning : t.success}>{money(balance)}</Text></View>
       </Card>
 
-      <Button title={initial ? 'Save changes' : 'Save order'} icon="checkmark" onPress={save} loading={saving} size="lg" style={{ marginTop: Spacing.lg }} />
+      <Button title={initial ? 'Save changes' : `Save ${terms.order.toLowerCase()}`} icon="checkmark" onPress={save} loading={saving} size="lg" style={{ marginTop: Spacing.lg }} />
       {initial ? <Button title="Delete" variant="danger" onPress={remove} style={{ marginTop: Spacing.md }} /> : null}
 
       <SelectModal visible={productModal} title="Choose product" onClose={() => setProductModal(false)} onSelect={addProduct} options={products.map((p) => ({ id: String(p.id), label: p.name, sublabel: money(p.price) }))} footerLabel="Create product" onFooter={() => { setProductModal(false); router.push('/products/new'); }} />

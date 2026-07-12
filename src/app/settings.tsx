@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, View } from 'react-native';
 
+import { FadeSlide } from '@/components/anim';
 import { AppHeader, Button, Card, Divider, ListRow, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { SelectField, SelectModal } from '@/components/pickers';
 import { CURRENCIES, findCurrency } from '@/constants/currencies';
@@ -133,32 +134,38 @@ export default function Settings() {
     <Screen>
       <AppHeader title="Settings" back />
 
-      <SectionHeader title="Business" />
-      <Card style={{ gap: Spacing.md, marginBottom: Spacing.lg }}>
-        <TextField label="Business name" value={name} onChangeText={setName} right={<Pressable onPress={saveName}><Text variant="label" color={t.primary}>Save</Text></Pressable>} />
-        <SelectField label="Industry / Dashboard" value={industry.name} onPress={() => setIndustryModal(true)} />
-        <SelectField label="Currency" value={`${settings.currency_symbol} · ${settings.currency_code}`} onPress={() => setCurrencyModal(true)} />
-      </Card>
+      <FadeSlide delay={0}>
+        <SectionHeader title="Business" />
+        <Card style={{ gap: Spacing.md, marginBottom: Spacing.lg }}>
+          <TextField label="Business name" value={name} onChangeText={setName} right={<Pressable onPress={saveName}><Text variant="label" color={t.primary}>Save</Text></Pressable>} />
+          <SelectField label="Industry / Dashboard" value={industry.name} onPress={() => setIndustryModal(true)} />
+          <SelectField label="Currency" value={`${settings.currency_symbol} · ${settings.currency_code}`} onPress={() => setCurrencyModal(true)} />
+        </Card>
+      </FadeSlide>
 
-      <SectionHeader title="Security" />
-      <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
-        <ToggleRow icon="lock-closed" label="App lock (PIN)" value={settings.lock_enabled === 1} onToggle={toggleLock} />
-        {settings.lock_enabled === 1 ? (
-          <>
-            <Divider />
-            <ToggleRow icon="finger-print" label="Biometric unlock" value={settings.biometric_enabled === 1} onToggle={toggleBiometric} />
-            <Divider />
-            <ListRow icon="key" iconTone="primary" title="Change PIN" onPress={() => setPinModal(true)} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
-          </>
-        ) : null}
-      </Card>
+      <FadeSlide delay={80}>
+        <SectionHeader title="Security" />
+        <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+          <ToggleRow icon="lock-closed" label="App lock (PIN)" value={settings.lock_enabled === 1} onToggle={toggleLock} />
+          {settings.lock_enabled === 1 ? (
+            <>
+              <Divider />
+              <ToggleRow icon="finger-print" label="Biometric unlock" value={settings.biometric_enabled === 1} onToggle={toggleBiometric} />
+              <Divider />
+              <ListRow icon="key" iconTone="primary" title="Change PIN" onPress={() => setPinModal(true)} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+            </>
+          ) : null}
+        </Card>
+      </FadeSlide>
 
-      <SectionHeader title="Data" />
-      <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
-        <ListRow icon="cloud-upload" iconTone="success" title="Export backup" subtitle="Save all data to a file" onPress={doExport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
-        <Divider />
-        <ListRow icon="cloud-download" iconTone="warning" title="Restore backup" subtitle="Replace data from a file" onPress={doImport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
-      </Card>
+      <FadeSlide delay={160}>
+        <SectionHeader title="Data" />
+        <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+          <ListRow icon="cloud-upload" iconTone="success" title="Export backup" subtitle="Save all data to a file" onPress={doExport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+          <Divider />
+          <ListRow icon="cloud-download" iconTone="warning" title="Restore backup" subtitle="Replace data from a file" onPress={doImport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+        </Card>
+      </FadeSlide>
 
       <Text variant="caption" color={t.textMuted} style={{ textAlign: 'center', marginTop: Spacing.md }}>
         Trackr v1.0.0

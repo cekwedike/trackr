@@ -195,6 +195,10 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE settings ADD COLUMN industry TEXT NOT NULL DEFAULT 'general';
   `,
+  // v3: Google-Keep-style notes — per-note color theme (pinned already exists in v1)
+  `
+  ALTER TABLE notes ADD COLUMN color TEXT;
+  `,
 ];
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {

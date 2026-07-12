@@ -1,14 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import React from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { AllocationDonut, AnimatedCounter, DONUT_COLORS, GradientBackdrop, ProfitGauge, Sparkline, Waveform } from '@/components/anim';
+import { AllocationDonut, AnimatedCounter, Aurora, DONUT_COLORS, GradientBackdrop, ProfitGauge, Sparkline, TiltCard, Waveform } from '@/components/anim';
+import { AnimatedGrid } from '@/components/nav';
 import { Card, Chip, ListRow, SectionHeader, Text } from '@/components/ui';
 import { useColumns } from '@/hooks/use-columns';
 import { useTheme } from '@/hooks/use-theme';
 import { Radius, Shadow, Spacing } from '@/constants/theme';
-import type { QuickActionKey } from '@/constants/industries';
+import { QUICK_ACTION_META } from '@/constants/quick-actions';
 import { useApp } from '@/context/app-context';
 import { ORDER_STATUSES } from '@/db/repos/orders';
 import type { DashboardData } from '@/lib/dashboard-data';
@@ -56,8 +57,9 @@ function HeroRevenue({ data, range, setRange }: WidgetProps) {
   const label = rangeBounds(range).label;
 
   return (
-    <View style={{ borderRadius: Radius.xl, overflow: 'hidden', marginBottom: Spacing.lg, ...Shadow.lg }}>
+    <TiltCard intensity={6} lift={1.015} style={{ borderRadius: Radius.xl, overflow: 'hidden', marginBottom: Spacing.lg, ...Shadow.lg }}>
       <GradientBackdrop from={from} to={to} id="hero" />
+      <Aurora colors={[WHITE, from, to]} opacity={0.28} />
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
         <Waveform color={WHITE} height={88} />
       </View>
@@ -122,46 +124,48 @@ function HeroRevenue({ data, range, setRange }: WidgetProps) {
           })}
         </View>
       </View>
-    </View>
+    </TiltCard>
   );
 }
 
 // ---------------------------------------------------------------- Quick actions
-const QUICK_ACTIONS: Record<QuickActionKey, { icon: IconName; href: Href; label: (t: ReturnType<typeof useApp>['terms']) => string }> = {
-  sale: { icon: 'cart', href: '/sales/new' as Href, label: (t) => `New ${t.sale.toLowerCase()}` },
-  expense: { icon: 'trending-down', href: '/expenses/new' as Href, label: () => 'Add expense' },
-  order: { icon: 'clipboard', href: '/orders/new' as Href, label: (t) => `New ${t.order.toLowerCase()}` },
-  product: { icon: 'cube', href: '/products/new' as Href, label: (t) => `New ${t.item.toLowerCase()}` },
-  customer: { icon: 'person-add', href: '/customers/new' as Href, label: (t) => `New ${t.customer.toLowerCase()}` },
-  profit: { icon: 'calculator', href: '/profit' as Href, label: () => 'Profit split' },
-  reminder: { icon: 'alarm', href: '/reminders/new' as Href, label: () => 'Reminder' },
-  recipe: { icon: 'reader', href: '/recipes/new' as Href, label: () => 'New recipe' },
-};
-
 function QuickActions() {
   const t = useTheme();
   const router = useRouter();
   const { industry, terms, accent } = useApp();
   return (
     <View style={{ marginBottom: Spacing.lg }}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
-        {industry.quickActions.map((key) => {
-          const a = QUICK_ACTIONS[key];
+      <AnimatedGrid
+        data={industry.quickActions}
+        columns={2}
+        keyExtractor={(key) => key}
+        renderItem={(key) => {
+          const a = QUICK_ACTION_META[key];
           if (!a) return null;
           return (
-            <Card
-              key={key}
+            <TiltCard
               onPress={() => router.push(a.href)}
-              style={{ flexBasis: '47%', flexGrow: 1, alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.lg }}
+              intensity={10}
+              style={{
+                alignItems: 'center',
+                gap: Spacing.sm,
+                paddingVertical: Spacing.lg,
+                backgroundColor: t.card,
+                borderRadius: Radius.lg,
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: t.border,
+                overflow: 'hidden',
+                ...Shadow.sm,
+              }}
             >
               <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: hexToRgba(accent, 0.14), alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons name={a.icon} size={22} color={accent} />
               </View>
               <Text variant="label" color={t.text}>{a.label(terms)}</Text>
-            </Card>
+            </TiltCard>
           );
-        })}
-      </View>
+        }}
+      />
     </View>
   );
 }
@@ -177,7 +181,21 @@ function ProfitPulse({ data }: WidgetProps) {
   return (
     <>
       <SectionHeader title="Profit" action="Edit split" onAction={() => router.push('/profit' as Href)} />
-      <Card onPress={() => router.push('/profit' as Href)} style={{ marginBottom: Spacing.lg, gap: Spacing.lg }}>
+      <TiltCard
+        onPress={() => router.push('/profit' as Href)}
+        intensity={6}
+        style={{
+          marginBottom: Spacing.lg,
+          gap: Spacing.lg,
+          backgroundColor: t.card,
+          borderRadius: Radius.lg,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: t.border,
+          padding: Spacing.lg,
+          overflow: 'hidden',
+          ...Shadow.md,
+        }}
+      >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.lg }}>
           <ProfitGauge
             value={margin}
@@ -217,7 +235,7 @@ function ProfitPulse({ data }: WidgetProps) {
             </View>
           </View>
         ) : null}
-      </Card>
+      </TiltCard>
     </>
   );
 }

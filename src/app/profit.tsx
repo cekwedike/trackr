@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
-import { AllocationDonut, DONUT_COLORS } from '@/components/anim';
+import { AllocationDonut, DONUT_COLORS, FadeSlide } from '@/components/anim';
 import { AppHeader, Button, Card, Chip, Divider, IconButton, Screen, SectionHeader, Segmented, Text, TextField } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { getIndustry } from '@/constants/industries';
@@ -85,18 +85,20 @@ export default function ProfitScreen() {
         />
       </View>
 
-      <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
-        <Row label="Revenue" value={money(data?.revenue ?? 0)} color={t.success} />
-        <Row label="Cost of goods (COGS)" value={money(data?.cogs ?? 0)} />
-        <Row label="Expenses" value={money(data?.expenses ?? 0)} color={t.danger} />
-        <Divider />
-        <Row label="Gross profit" value={money(data?.grossProfit ?? 0)} bold />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text variant="subtitle">Net profit</Text>
-          <Text variant="title" color={net >= 0 ? t.success : t.danger}>{money(net)}</Text>
-        </View>
-        <Chip label={`${Math.round((data?.margin ?? 0) * 100)}% margin`} tone={net >= 0 ? 'success' : 'danger'} />
-      </Card>
+      <FadeSlide>
+        <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
+          <Row label="Revenue" value={money(data?.revenue ?? 0)} color={t.success} />
+          <Row label="Cost of goods (COGS)" value={money(data?.cogs ?? 0)} />
+          <Row label="Expenses" value={money(data?.expenses ?? 0)} color={t.danger} />
+          <Divider />
+          <Row label="Gross profit" value={money(data?.grossProfit ?? 0)} bold />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text variant="subtitle">Net profit</Text>
+            <Text variant="title" color={net >= 0 ? t.success : t.danger}>{money(net)}</Text>
+          </View>
+          <Chip label={`${Math.round((data?.margin ?? 0) * 100)}% margin`} tone={net >= 0 ? 'success' : 'danger'} />
+        </Card>
+      </FadeSlide>
 
       <SectionHeader title="Profit allocation" action={editing ? 'Cancel' : 'Edit split'} onAction={() => { setEditing((v) => !v); setBuckets(parseAllocation(settings?.profit_allocation)); }} />
 

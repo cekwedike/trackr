@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
+  LayoutChangeEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,10 +18,21 @@ import {
   type ViewStyle,
   type KeyboardTypeOptions,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PressableScale } from '@/components/anim/pressable';
+import { Duration, Ease, PressScale, Spring } from '@/constants/motion';
 import { FontSize, FontWeight, MaxContentWidth, Radius, Shadow, Spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { shade } from '@/lib/color';
+import { selectionFeedback } from '@/lib/haptics';
 
 const APP_ICON = require('../../assets/images/icon.png');
 
@@ -54,7 +66,7 @@ export function Brand({
   );
 }
 
-/** Animated on/off switch. */
+/** Animated on/off switch with a springy thumb and selection haptics. */
 export function Toggle({
   value,
   onValueChange,
@@ -65,19 +77,39 @@ export function Toggle({
   disabled?: boolean;
 }) {
   const t = useTheme();
-  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
-  useEffect(() => {
-    Animated.timing(anim, { toValue: value ? 1 : 0, duration: 180, useNativeDriver: false }).start();
-  }, [value, anim]);
-  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [t.borderStrong, t.primary] });
-  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [3, 25] });
+  const reduced = useReducedMotion();
+  const progress = useSharedValue(value ? 1 : 0);
+
+  React.useEffect(() => {
+    progress.value = reduced
+      ? withTiming(value ? 1 : 0, { duration: Duration.fast })
+      : withSpring(value ? 1 : 0, Spring.snappy);
+  }, [value, reduced, progress]);
+
+  const trackStyle = useAnimatedStyle(() => ({
+    backgroundColor: progress.value > 0.5 ? t.primary : t.borderStrong,
+  }));
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: 3 + progress.value * 22 }, { scale: 1 + progress.value * 0.04 }],
+  }));
+
   return (
-    <Pressable onPress={() => !disabled && onValueChange(!value)} hitSlop={10} disabled={disabled} style={{ opacity: disabled ? 0.5 : 1 }}>
-      <Animated.View style={{ width: 52, height: 30, borderRadius: 15, backgroundColor: trackColor, justifyContent: 'center' }}>
+    <Pressable
+      onPress={() => {
+        if (disabled) return;
+        selectionFeedback();
+        onValueChange(!value);
+      }}
+      hitSlop={10}
+      disabled={disabled}
+      style={{ opacity: disabled ? 0.5 : 1 }}
+    >
+      <Animated.View style={[{ width: 52, height: 30, borderRadius: 15, justifyContent: 'center' }, trackStyle]}>
         <Animated.View
           style={[
-            { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', transform: [{ translateX }] },
+            { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF' },
             Shadow.sm,
+            thumbStyle,
           ]}
         />
       </Animated.View>
@@ -203,9 +235,9 @@ export function Card({
   };
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [cardStyle, pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] }, style]}>
+      <PressableScale onPress={onPress} scaleTo={PressScale.card} style={[cardStyle, style]}>
         {children}
-      </Pressable>
+      </PressableScale>
     );
   }
   return <View style={[cardStyle, style]}>{children}</View>;
@@ -233,16 +265,19 @@ export function Button({
 }) {
   const t = useTheme();
   const heights = { sm: 38, md: 48, lg: 56 };
+  const filled = variant === 'primary' || variant === 'danger';
   const bg =
     variant === 'primary' ? t.primary : variant === 'danger' ? t.danger : variant === 'secondary' ? t.cardAlt : 'transparent';
-  const fg =
-    variant === 'primary' || variant === 'danger' ? '#FFFFFF' : variant === 'ghost' ? t.primary : t.text;
+  const fg = filled ? '#FFFFFF' : variant === 'ghost' ? t.primary : t.text;
   const border = variant === 'ghost' ? { borderWidth: 1, borderColor: t.border } : null;
+  const gradient: [string, string] = [shade(bg, 0.12), shade(bg, -0.14)];
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [
+      scaleTo={PressScale.button}
+      haptic={filled}
+      style={[
         {
           height: heights[size],
           borderRadius: Radius.md,
@@ -252,12 +287,21 @@ export function Button({
           justifyContent: 'center',
           gap: Spacing.sm,
           paddingHorizontal: Spacing.lg,
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+          overflow: 'hidden',
+          ...(filled ? Shadow.sm : null),
         },
         border,
         style,
       ]}
     >
+      {filled ? (
+        <LinearGradient
+          colors={gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
@@ -268,7 +312,7 @@ export function Button({
           </RNText>
         </>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -289,23 +333,22 @@ export function IconButton({
   const t = useTheme();
   const c = tone ? toneColor(t, tone) : null;
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       hitSlop={8}
-      style={({ pressed }) => [
-        {
-          width: 40,
-          height: 40,
-          borderRadius: Radius.md,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: c ? c.bg : 'transparent',
-          opacity: pressed ? 0.6 : 1,
-        },
-      ]}
+      scaleTo={PressScale.icon}
+      opacityTo={0.7}
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: Radius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: c ? c.bg : 'transparent',
+      }}
     >
       <Ionicons name={icon} size={size} color={color ?? c?.fg ?? t.text} />
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -394,6 +437,40 @@ export function Segmented<T extends string>({
   scroll?: boolean;
 }) {
   const t = useTheme();
+  const reduced = useReducedMotion();
+  const [layouts, setLayouts] = useState<Record<string, { x: number; width: number }>>({});
+  const ix = useSharedValue(0);
+  const iw = useSharedValue(0);
+  const ready = useSharedValue(0);
+
+  const activeLayout = layouts[value];
+  React.useEffect(() => {
+    if (!activeLayout) return;
+    const cfg = reduced ? { duration: Duration.fast, easing: Ease.standard } : undefined;
+    if (ready.value === 0) {
+      ix.value = activeLayout.x;
+      iw.value = activeLayout.width;
+      ready.value = 1;
+    } else if (cfg) {
+      ix.value = withTiming(activeLayout.x, cfg);
+      iw.value = withTiming(activeLayout.width, cfg);
+    } else {
+      ix.value = withSpring(activeLayout.x, Spring.snappy);
+      iw.value = withSpring(activeLayout.width, Spring.snappy);
+    }
+  }, [activeLayout, reduced, ix, iw, ready]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    opacity: ready.value,
+    width: iw.value,
+    transform: [{ translateX: ix.value }],
+  }));
+
+  const onItemLayout = (key: string) => (e: LayoutChangeEvent) => {
+    const { x, width } = e.nativeEvent.layout;
+    setLayouts((prev) => (prev[key]?.x === x && prev[key]?.width === width ? prev : { ...prev, [key]: { x, width } }));
+  };
+
   const inner = (
     <View
       style={{
@@ -405,20 +482,37 @@ export function Segmented<T extends string>({
         alignSelf: scroll ? 'flex-start' : 'auto',
       }}
     >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          {
+            position: 'absolute',
+            top: 3,
+            bottom: 3,
+            left: 0,
+            borderRadius: Radius.sm,
+            backgroundColor: t.card,
+            ...Shadow.sm,
+          },
+          indicatorStyle,
+        ]}
+      />
       {options.map((o) => {
         const active = o.value === value;
         return (
           <Pressable
             key={o.value}
-            onPress={() => onChange(o.value)}
+            onLayout={onItemLayout(o.value)}
+            onPress={() => {
+              if (!active) selectionFeedback();
+              onChange(o.value);
+            }}
             style={{
               flex: scroll ? undefined : 1,
               paddingVertical: Spacing.sm,
               paddingHorizontal: Spacing.md,
               borderRadius: Radius.sm,
-              backgroundColor: active ? t.card : 'transparent',
               alignItems: 'center',
-              ...(active ? Shadow.sm : null),
             }}
           >
             <RNText
@@ -446,26 +540,33 @@ export function Segmented<T extends string>({
 }
 
 // ---------- Chip ----------
-export function Chip({ label, tone = 'default', icon }: { label: string; tone?: Tone; icon?: IconName }) {
+export function Chip({ label, tone = 'default', icon, onPress }: { label: string; tone?: Tone; icon?: IconName; onPress?: () => void }) {
   const t = useTheme();
   const c = toneColor(t, tone);
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: c.bg,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: 5,
-        borderRadius: Radius.pill,
-        alignSelf: 'flex-start',
-      }}
-    >
+  const body = (
+    <>
       {icon ? <Ionicons name={icon} size={12} color={c.fg} /> : null}
       <RNText style={{ color: c.fg, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>{label}</RNText>
-    </View>
+    </>
   );
+  const chipStyle: ViewStyle = {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: c.bg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 5,
+    borderRadius: Radius.pill,
+    alignSelf: 'flex-start',
+  };
+  if (onPress) {
+    return (
+      <PressableScale onPress={onPress} scaleTo={PressScale.chip} style={chipStyle}>
+        {body}
+      </PressableScale>
+    );
+  }
+  return <View style={chipStyle}>{body}</View>;
 }
 
 // ---------- StatCard ----------
@@ -523,16 +624,17 @@ export function ListRow({
   const t = useTheme();
   const c = toneColor(t, iconTone);
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       onLongPress={onLongPress}
-      style={({ pressed }) => ({
+      scaleTo={PressScale.row}
+      opacityTo={0.7}
+      style={{
         flexDirection: 'row',
         alignItems: 'center',
         gap: Spacing.md,
         paddingVertical: Spacing.md,
-        opacity: pressed ? 0.6 : 1,
-      })}
+      }}
     >
       {icon ? (
         <View style={{ width: 42, height: 42, borderRadius: Radius.md, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }}>
@@ -544,7 +646,7 @@ export function ListRow({
         {subtitle ? <Text variant="caption" color={t.textSecondary} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
       {right}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -579,9 +681,11 @@ export function EmptyState({
 export function FAB({ icon = 'add', onPress, label }: { icon?: IconName; onPress?: () => void; label?: string }) {
   const t = useTheme();
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
-      style={({ pressed }) => ({
+      haptic
+      scaleTo={0.92}
+      style={{
         position: 'absolute',
         right: Spacing.lg,
         bottom: Spacing.xl,
@@ -594,17 +698,16 @@ export function FAB({ icon = 'add', onPress, label }: { icon?: IconName; onPress
         gap: Spacing.sm,
         paddingHorizontal: label ? Spacing.xl : 0,
         width: label ? undefined : 56,
-        opacity: pressed ? 0.85 : 1,
         shadowColor: '#000',
         shadowOpacity: 0.2,
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 4 },
         elevation: 6,
-      })}
+      }}
     >
       <Ionicons name={icon} size={26} color="#FFFFFF" />
       {label ? <RNText style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold, fontSize: FontSize.md }}>{label}</RNText> : null}
-    </Pressable>
+    </PressableScale>
   );
 }
 

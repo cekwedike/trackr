@@ -6,6 +6,7 @@ export interface NoteInput {
   title: string;
   body: string;
   pinned?: number;
+  color?: string | null;
 }
 
 const WIKI_LINK_RE = /\[\[([^\]]+)\]\]/g;
@@ -62,8 +63,8 @@ export async function createNote(input: NoteInput): Promise<number> {
   const db = await getDb();
   const now = nowIso();
   const res = await db.runAsync(
-    'INSERT INTO notes (title, body, pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-    [input.title || 'Untitled', input.body ?? '', input.pinned ?? 0, now, now],
+    'INSERT INTO notes (title, body, pinned, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [input.title || 'Untitled', input.body ?? '', input.pinned ?? 0, input.color ?? null, now, now],
   );
   const id = res.lastInsertRowId;
   await rebuildWikiLinks(id, input.body ?? '');
@@ -73,10 +74,11 @@ export async function createNote(input: NoteInput): Promise<number> {
 
 export async function updateNote(id: number, input: NoteInput): Promise<void> {
   const db = await getDb();
-  await db.runAsync('UPDATE notes SET title = ?, body = ?, pinned = ?, updated_at = ? WHERE id = ?', [
+  await db.runAsync('UPDATE notes SET title = ?, body = ?, pinned = ?, color = ?, updated_at = ? WHERE id = ?', [
     input.title || 'Untitled',
     input.body ?? '',
     input.pinned ?? 0,
+    input.color ?? null,
     nowIso(),
     id,
   ]);
@@ -105,6 +107,37 @@ export async function deleteNote(id: number): Promise<void> {
 export async function togglePinned(id: number, pinned: boolean): Promise<void> {
   const db = await getDb();
   await db.runAsync('UPDATE notes SET pinned = ?, updated_at = ? WHERE id = ?', [pinned ? 1 : 0, nowIso(), id]);
+}
+
+/** Alias for togglePinned with an explicit numeric flag, for call sites that hold `0 | 1`. */
+export async function setNotePinned(id: number, pinned: number): Promise<void> {
+  await togglePinned(id, pinned === 1);
+}
+
+/** Set (or clear, with null) the per-note color-theme key. Leaves updated_at untouched to avoid reordering. */
+export async function setNoteColor(id: number, color: string | null): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE notes SET color = ? WHERE id = ?', [color, id]);
+}
+
+/** Entity link (customer/product/order) attached to a note, used by the Connection view. */
+export interface NoteEntityLink {
+  link_id: number;
+  note_id: number;
+  target_type: LinkTargetType;
+  target_id: number | null;
+  target_title: string | null;
+}
+
+/** All entity attachments (customer/product/order) across every note, for grouping in the Connection view. */
+export async function listNoteEntityLinks(): Promise<NoteEntityLink[]> {
+  const db = await getDb();
+  return db.getAllAsync<NoteEntityLink>(
+    `SELECT id AS link_id, source_note_id AS note_id, target_type, target_id, target_title
+     FROM links
+     WHERE target_type IN ('customer', 'product', 'order')
+     ORDER BY target_type ASC, target_title ASC`,
+  );
 }
 
 // ----- Links -----
