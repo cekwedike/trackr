@@ -72,6 +72,13 @@ export async function deleteReminder(id: number): Promise<void> {
   await db.runAsync('DELETE FROM reminders WHERE id = ?', [id]);
 }
 
+/** Total number of reminders ever created (including completed). */
+export async function countReminders(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM reminders');
+  return row?.c ?? 0;
+}
+
 export async function upcomingReminders(limit = 5): Promise<Reminder[]> {
   const db = await getDb();
   return db.getAllAsync<Reminder>(

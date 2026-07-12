@@ -80,6 +80,13 @@ export async function searchExpenses(q: string, limit = 20): Promise<ExpenseSear
   );
 }
 
+/** Total number of recorded expenses. */
+export async function countExpenses(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM expenses');
+  return row?.c ?? 0;
+}
+
 export async function sumExpenses(start: string, end: string): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ total: number }>(

@@ -112,6 +112,13 @@ export async function searchProducts(q: string, limit = 20): Promise<ProductSear
   );
 }
 
+/** Total number of active products. */
+export async function countProducts(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM products WHERE is_active = 1');
+  return row?.c ?? 0;
+}
+
 export async function listLowStockProducts(): Promise<Product[]> {
   const db = await getDb();
   return db.getAllAsync<Product>(

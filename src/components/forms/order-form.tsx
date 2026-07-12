@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { Button, Card, IconButton, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import { HelpTip } from '@/components/help';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
@@ -79,7 +80,8 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
       };
       if (initial) await updateOrder(initial.id, payload);
       else await createOrder(payload);
-      onDone ? onDone() : router.back();
+      if (onDone) onDone();
+      else router.back();
     } finally {
       setSaving(false);
     }
@@ -123,12 +125,41 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
         <Button title="Add product" icon="add" variant="secondary" onPress={() => setProductModal(true)} />
       </Card>
 
-      <SectionHeader title="Details" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm }}>
+        <Text variant="label" color={t.textSecondary}>DETAILS</Text>
+        <HelpTip
+          title={`${terms.order} statuses`}
+          subtitle="Track progress at a glance"
+          points={[
+            { term: 'Pending', desc: `A new ${terms.order.toLowerCase()} you haven’t started yet.` },
+            { term: 'In progress', desc: 'You’re actively working on it.' },
+            { term: 'Ready', desc: 'Finished and waiting for pickup or delivery.' },
+            { term: 'Delivered', desc: 'Completed and handed over. It leaves your active pipeline.' },
+            { term: 'Cancelled', desc: 'Called off. Also removed from the active pipeline.' },
+          ]}
+        />
+      </View>
       <Card style={{ gap: Spacing.md }}>
         <SelectField label="Status" value={ORDER_STATUSES.find((s) => s.value === status)?.label} onPress={() => setStatusModal(true)} />
         <SelectField label="Due date" value={hasDue ? due.toDateString() : 'None'} onPress={() => setHasDue((v) => !v)} />
         {hasDue ? <DateTimeField value={due} onChange={setDue} /> : null}
-        <TextField label="Amount paid" value={paid} onChangeText={setPaid} keyboardType="numeric" prefix={currencySymbol} />
+        <TextField
+          label="Amount paid"
+          value={paid}
+          onChangeText={setPaid}
+          keyboardType="numeric"
+          prefix={currencySymbol}
+          right={
+            <HelpTip
+              title="Amount paid & balance"
+              subtitle="Who owes what"
+              paragraphs={[
+                `Amount paid is how much the ${terms.customer.toLowerCase()} has given you so far for this ${terms.order.toLowerCase()}.`,
+                'Balance = total − amount paid. It’s what they still owe. A balance above zero shows in amber until it’s fully settled; leave it as the total if nothing has been paid yet.',
+              ]}
+            />
+          }
+        />
         <TextField label="Note" value={note} onChangeText={setNote} placeholder="Optional" multiline />
       </Card>
 

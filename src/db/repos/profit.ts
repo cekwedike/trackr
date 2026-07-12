@@ -46,6 +46,13 @@ export async function getProfitRecord(month: string): Promise<ProfitRecord | nul
   return db.getFirstAsync<ProfitRecord>('SELECT * FROM profit_records WHERE month = ?', [month]);
 }
 
+/** Number of months that have been recorded to profit history. */
+export async function countProfitRecords(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM profit_records');
+  return row?.c ?? 0;
+}
+
 export async function deleteProfitRecord(month: string): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM profit_records WHERE month = ?', [month]);

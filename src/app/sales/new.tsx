@@ -1,18 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { Button, Card, IconButton, Screen, AppHeader, SectionHeader, Text, TextField } from '@/components/ui';
+import { HelpTip } from '@/components/help';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listCustomers } from '@/db/repos/customers';
 import { listProducts } from '@/db/repos/products';
 import { createSale } from '@/db/repos/sales';
 import type { Customer, PaymentMethod, Product } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
-import { fromMinor, parseMoney, toMinor } from '@/lib/money';
+import { fromMinor, parseMoney } from '@/lib/money';
 
 interface LineItem {
   key: string;
@@ -158,7 +158,22 @@ export default function NewSale() {
         <Button title="Add product" icon="add" variant="secondary" onPress={() => setProductModal(true)} />
       </Card>
 
-      <SectionHeader title="Details" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm }}>
+        <Text variant="label" color={t.textSecondary}>DETAILS</Text>
+        <HelpTip
+          title="Payment methods"
+          subtitle="How you were paid"
+          points={[
+            { term: 'Cash', desc: 'Paid in physical cash.' },
+            { term: 'Transfer', desc: 'Sent to your bank account.' },
+            { term: 'POS', desc: 'Paid via a POS terminal.' },
+            { term: 'Card', desc: 'Paid by debit or credit card.' },
+            { term: 'Credit (owed)', desc: 'Not paid yet. Trackr adds the amount to the customer’s debt balance automatically.' },
+            { term: 'Other', desc: 'Anything that doesn’t fit the above.' },
+          ]}
+          tip="Choosing a customer with a Credit sale keeps their running debt accurate."
+        />
+      </View>
       <Card style={{ gap: Spacing.md, marginBottom: Spacing.lg }}>
         <DateTimeField label="Date & time" value={occurredAt} onChange={setOccurredAt} />
         <SelectField label="Payment method" value={PAYMENT_METHODS.find((m) => m.value === method)?.label} onPress={() => setMethodModal(true)} />

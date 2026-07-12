@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import { HelpTip } from '@/components/help';
 import { SelectField, SelectModal } from '@/components/pickers';
 import { Radius, Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
@@ -111,7 +112,22 @@ export function ProductForm({ initial }: { initial?: Product }) {
           <TextField style={{ flex: 1 }} label="Quantity" value={stock} onChangeText={setStock} keyboardType="numeric" />
           <SelectField label="Unit" value={unit} onPress={() => setUnitModal(true)} />
         </View>
-        <TextField label="Low-stock alert at" value={threshold} onChangeText={setThreshold} keyboardType="numeric" />
+        <TextField
+          label="Low-stock alert at"
+          value={threshold}
+          onChangeText={setThreshold}
+          keyboardType="numeric"
+          right={
+            <HelpTip
+              title="Low-stock alert"
+              subtitle="Your reorder reminder"
+              paragraphs={[
+                'This is the quantity at which Trackr warns you it’s time to restock. When stock falls to this number or below, the item shows up in your dashboard’s low-stock alerts.',
+                'Set it to a level that gives you enough time to reorder before you run out. Enter 0 to switch the alert off for this item.',
+              ]}
+            />
+          }
+        />
         {initial ? (
           <View style={{ gap: Spacing.sm }}>
             <Text variant="label" color={t.textSecondary}>Quick adjust (current: {formatQty(parseFloat(stock) || 0)} {unit})</Text>

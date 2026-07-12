@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { RecipeForm } from '@/components/forms/recipe-form';
-import { AppHeader, Button, Card, Chip, Divider, IconButton, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import { AppHeader, Card, Chip, Divider, IconButton, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import { HelpTip } from '@/components/help';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { getIngredient } from '@/db/repos/ingredients';
@@ -94,7 +95,18 @@ export default function RecipeDetail() {
         {items.length === 0 ? <Text variant="caption" color={t.textMuted}>No ingredients.</Text> : null}
       </Card>
 
-      <SectionHeader title="Pricing helper" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm }}>
+        <Text variant="label" color={t.textSecondary}>PRICING HELPER</Text>
+        <HelpTip
+          title="Pricing helper"
+          subtitle="Price for the profit you want"
+          paragraphs={[
+            'Enter the profit margin you’d like to earn and Trackr suggests a selling price that hits it, based on your cost per unit.',
+            'Margin is the share of the selling price that is profit. For example, a 40% margin means 40% of the price is profit and 60% covers your cost.',
+          ]}
+          tip="Higher margins mean more profit per unit, but keep prices realistic for your market."
+        />
+      </View>
       <Card style={{ gap: Spacing.md }}>
         <TextField label="Target profit margin (%)" value={margin} onChangeText={setMargin} keyboardType="numeric" />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

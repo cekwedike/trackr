@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { AllocationDonut, DONUT_COLORS, FadeSlide, Stagger } from '@/components/anim';
+import { HelpTip } from '@/components/help';
 import {
   AppHeader,
   Button,
@@ -202,7 +203,22 @@ export default function ProfitScreen() {
       <FadeSlide>
         <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text variant="label" color={t.textSecondary}>INCOME STATEMENT</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+              <Text variant="label" color={t.textSecondary}>INCOME STATEMENT</Text>
+              <HelpTip
+                title="Reading your income statement"
+                subtitle="How Trackr works out profit"
+                points={[
+                  { term: 'Revenue', desc: 'All the money your sales brought in for the month.' },
+                  { term: 'Cost of goods sold (COGS)', desc: 'What the items you sold cost you to make or buy — the direct cost of each sale.' },
+                  { term: 'Gross profit', desc: 'Revenue − COGS. What’s left after covering the cost of what you sold, before other bills.' },
+                  { term: 'Operating expenses', desc: 'Your running costs like rent, transport and salaries.' },
+                  { term: 'Net profit', desc: 'Gross profit − expenses. Your true bottom line for the month.' },
+                  { term: 'Realized (distributable) profit', desc: 'The profit you can actually share out. If the month broke even or lost money, this is zero — you can’t distribute money you didn’t make.' },
+                ]}
+                tip="Trackr uses cash-basis figures: amounts count in the month you dated them."
+              />
+            </View>
             {record ? <Chip label={`Saved ${formatDate(record.updated_at)}`} tone="success" icon="checkmark-circle" /> : null}
           </View>
           <Row label="Revenue (sales income)" value={money(summary?.revenue ?? 0)} color={t.success} />
@@ -230,11 +246,28 @@ export default function ProfitScreen() {
       </FadeSlide>
 
       {/* Allocation */}
-      <SectionHeader
-        title="Profit allocation"
-        action={editing ? 'Done' : 'Edit split'}
-        onAction={() => setEditing((v) => !v)}
-      />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <Text variant="label" color={t.textSecondary}>PROFIT ALLOCATION</Text>
+          <HelpTip
+            title="How profit allocation works"
+            subtitle="Give every unit of profit a job"
+            paragraphs={[
+              'Allocation is your plan for splitting each month’s profit into "buckets" — like reinvesting in the business, savings, an emergency fund or your own pay.',
+              'Give each bucket a percentage. The percentages must add up to 100%. Trackr then shows the exact amount that goes to each bucket based on your realized profit.',
+            ]}
+            points={[
+              { term: 'Buckets', desc: 'Named pots of money you want to fund, e.g. Savings or Reinvest.' },
+              { term: 'Percent (%)', desc: 'The share of profit each bucket receives. All buckets together must total 100%.' },
+              { term: 'Recording a month', desc: 'Saves that month’s profit and split to your history. Recording the current month also sets your default split going forward.' },
+            ]}
+            tip="Try the industry template, an even split, or copy last month to start fast."
+          />
+        </View>
+        <Pressable onPress={() => setEditing((v) => !v)} hitSlop={8}>
+          <Text variant="label" color={t.primary}>{editing ? 'Done' : 'Edit split'}</Text>
+        </Pressable>
+      </View>
 
       <Card style={{ gap: Spacing.md, marginBottom: Spacing.lg }}>
         {editing ? (

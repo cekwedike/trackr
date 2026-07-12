@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { Button, Card, IconButton, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import { HelpTip } from '@/components/help';
 import { SelectField, SelectModal } from '@/components/pickers';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
@@ -25,7 +26,7 @@ const nextKey = () => `r-${counter++}`;
 
 export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () => void }) {
   const t = useTheme();
-  const { money, currencySymbol } = useApp();
+  const { money } = useApp();
 
   const [name, setName] = useState(initial?.name ?? '');
   const [productId, setProductId] = useState<number | null>(initial?.product_id ?? null);
@@ -83,7 +84,8 @@ export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () 
       };
       if (initial) await updateRecipe(initial.id, payload);
       else await createRecipe(payload);
-      onDone ? onDone() : router.back();
+      if (onDone) onDone();
+      else router.back();
     } finally {
       setSaving(false);
     }
@@ -136,8 +138,21 @@ export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () 
       </Card>
 
       <Card style={{ gap: Spacing.sm, marginTop: Spacing.lg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text variant="body" color={t.textSecondary}>Batch cost</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <Text variant="body" color={t.textSecondary}>Batch cost</Text>
+            <HelpTip
+              title="Cost calculator"
+              subtitle="Know what a batch really costs"
+              points={[
+                { term: 'Batch cost', desc: 'The total cost of all ingredients in one batch (each ingredient’s quantity × its unit cost).' },
+                { term: 'Yield', desc: 'How many finished units one batch produces.' },
+                { term: 'Cost per unit', desc: 'Batch cost ÷ yield — what a single unit costs you to make.' },
+                { term: 'Profit per unit', desc: 'Selling price − cost per unit, shown when you link a product.' },
+              ]}
+              tip="Keep ingredient unit costs up to date so this stays accurate."
+            />
+          </View>
           <Text variant="body" weight="semibold">{money(costMinor)}</Text>
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>

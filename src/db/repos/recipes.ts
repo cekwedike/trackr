@@ -75,6 +75,13 @@ export async function deleteRecipe(id: number): Promise<void> {
   await db.runAsync('DELETE FROM recipes WHERE id = ?', [id]);
 }
 
+/** Total number of recipes. */
+export async function countRecipes(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM recipes');
+  return row?.c ?? 0;
+}
+
 /** Total ingredient cost (minor units) for a recipe using current ingredient unit costs. */
 export async function computeRecipeCost(recipeId: number): Promise<number> {
   const db = await getDb();

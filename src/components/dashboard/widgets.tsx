@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AllocationDonut, AnimatedCounter, Aurora, DONUT_COLORS, GradientBackdrop, ProfitGauge, Sparkline, TiltCard, Waveform } from '@/components/anim';
 import { AnimatedGrid } from '@/components/nav';
+import { HelpTip } from '@/components/help';
 import { Card, Chip, ListRow, SectionHeader, Text } from '@/components/ui';
 import { useColumns } from '@/hooks/use-columns';
 import { useTheme } from '@/hooks/use-theme';
@@ -180,7 +181,24 @@ function ProfitPulse({ data }: WidgetProps) {
 
   return (
     <>
-      <SectionHeader title="Profit" action="Edit split" onAction={() => router.push('/profit' as Href)} />
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <Text variant="label" color={t.textSecondary}>PROFIT</Text>
+          <HelpTip
+            title="Profit at a glance"
+            subtitle="Margin and where profit goes"
+            points={[
+              { term: 'Net profit', desc: 'What’s left after cost of goods sold and expenses for the selected period.' },
+              { term: 'Margin', desc: 'Net profit as a share of revenue. The dial fills up as your margin grows.' },
+              { term: 'The profit split', desc: 'Your plan for dividing profit into buckets like savings, reinvesting and owner pay. The mini-ring previews it.' },
+            ]}
+            tip="Tap this card to open the Profit Calculator and edit your split."
+          />
+        </View>
+        <Pressable onPress={() => router.push('/profit' as Href)} hitSlop={8}>
+          <Text variant="label" color={t.primary}>Edit split</Text>
+        </Pressable>
+      </View>
       <TiltCard
         onPress={() => router.push('/profit' as Href)}
         intensity={6}

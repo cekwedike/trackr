@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { DashboardRenderer } from '@/components/dashboard/renderer';
+import { GettingStarted } from '@/components/dashboard/getting-started';
 import { MovableFab } from '@/components/nav';
 import { Screen } from '@/components/ui';
 import { useApp } from '@/context/app-context';
@@ -24,6 +25,7 @@ export default function Dashboard() {
   return (
     <>
       <Screen scroll>
+        <GettingStarted />
         <DashboardRenderer widgets={industry.widgets} data={dash} range={range} setRange={setRange} />
       </Screen>
       <MovableFab actions={fabActions} defaultKeys={defaultKeys} storageKey="dashboard" />

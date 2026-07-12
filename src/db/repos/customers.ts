@@ -99,6 +99,13 @@ export async function searchCustomers(q: string, limit = 20): Promise<CustomerSe
   );
 }
 
+/** Total number of customers. */
+export async function countCustomers(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM customers');
+  return row?.c ?? 0;
+}
+
 export async function totalDebts(): Promise<number> {
   const db = await getDb();
   const row = await db.getFirstAsync<{ total: number }>(

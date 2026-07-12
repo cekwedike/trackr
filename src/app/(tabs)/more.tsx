@@ -62,6 +62,7 @@ export default function More() {
   const sidebarItems = useMemo<SidebarItem[]>(
     () => [
       ...groups.flatMap((grp) => grp.items.map((it) => ({ key: String(it.href), icon: it.icon, label: it.title, onPress: () => router.push(it.href) }))),
+      { key: 'faq', icon: 'help-circle' as IconName, label: 'Help & FAQ', onPress: () => router.push('/faq') },
       { key: 'settings', icon: 'settings' as IconName, label: 'Settings', onPress: () => router.push('/settings') },
     ],
     [groups],
@@ -88,6 +89,8 @@ export default function More() {
               </View>
             ))}
             <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
+              <ListRow icon="help-circle" iconTone="info" title="Help & FAQ" subtitle="Answers, how-tos & tips" onPress={() => router.push('/faq')} right={<Chevron />} />
+              <View style={{ height: 1, backgroundColor: t.border }} />
               <ListRow icon="settings" iconTone="primary" title="Settings" subtitle="Business, currency, security, backup" onPress={() => router.push('/settings')} right={<Chevron />} />
             </Card>
             <Text variant="caption" color={t.textMuted} style={{ textAlign: 'center' }}>Trackr v1.0.0</Text>
@@ -116,6 +119,8 @@ export default function More() {
 
       <SectionHeader title="App" />
       <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
+        <ListRow icon="help-circle" iconTone="info" title="Help & FAQ" subtitle="Answers, how-tos & tips" onPress={() => router.push('/faq')} right={<Chevron />} />
+        <View style={{ height: 1, backgroundColor: t.border }} />
         <ListRow icon="settings" iconTone="primary" title="Settings" subtitle="Business, currency, security, backup" onPress={() => router.push('/settings')} right={<Chevron />} />
       </Card>
 

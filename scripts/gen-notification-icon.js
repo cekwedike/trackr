@@ -1,173 +1,95 @@
-// Generates a monochrome (white glyph, transparent background) PNG for the
-// Android notification small icon. Android silhouettes the alpha channel and
-// tints it with the `expo-notifications` plugin `color`, so we only draw a crisp
-// white glyph and rely on coverage-based anti-aliasing for smooth edges.
+// Generates the Android notification small icon: a professionally typeset
+// "Trackr" wordmark as a pure-white glyph on a fully transparent background.
 //
-// The glyph is the full "Trackr" wordmark (title case, matching the brand):
-// a bold, geometric sans-serif built from primitive shapes (rects, rings, and
-// thick line segments). The canvas is wider than tall so all six letters can be
-// laid out with generous spacing and a heavy stroke that survives shrinking to
-// status-bar size (~24dp). Every letter is rendered supersampled and averaged
-// for smooth anti-aliased edges.
+// Android status-bar small icons use ONLY the alpha channel as a silhouette and
+// then tint it with the `expo-notifications` plugin `color` (#2563EB here). So
+// the output must be white (#FFFFFF) pixels with an anti-aliased alpha mask and
+// transparency everywhere else — no background, no color.
+// (See https://docs.expo.dev/versions/v57.0.0/sdk/notifications/ — "96x96
+// all-white png with transparency".)
+//
+// Pipeline (real typeface, not hand-drawn primitives):
+//   1. opentype.js loads a genuine geometric sans-serif .ttf (Montserrat
+//      SemiBold, shipped as a build-time devDependency) and lays out the six
+//      glyphs of "Trackr" with tasteful optical letter-spacing.
+//   2. The combined glyph outline is emitted as an SVG <path> and rasterized by
+//      @resvg/resvg-js (prebuilt native binary) with anti-aliasing.
+//   3. Every rendered pixel's RGB is forced to pure white while its coverage
+//      alpha is preserved, guaranteeing a clean silhouette for Android to tint.
 //
 // Run: node scripts/gen-notification-icon.js
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const opentype = require('opentype.js');
+const { Resvg } = require('@resvg/resvg-js');
 
-const SS = 4; // supersampling factor for anti-aliased edges
+// ---- Typeface: Montserrat SemiBold (geometric sans, reads well when tiny) ----
+const FONT_PATH = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  '@expo-google-fonts',
+  'montserrat',
+  '600SemiBold',
+  'Montserrat_600SemiBold.ttf'
+);
 
-// ---- Shared vertical metrics (in output space) ----
-const HEIGHT = 96;
-const STROKE = 12; // stroke thickness (bold, to survive downscaling)
-const CAP_TOP = 16; // top of ascenders / cap letters (T, k)
-const X_TOP = 38; // top of x-height letters (r, a, c)
-const BASE = 78; // shared baseline
-const R_ROUND = (BASE - X_TOP) / 2; // radius of round letters (a, c) = 20
-const X_MID = (X_TOP + BASE) / 2; // vertical center of round letters = 58
+const TEXT = 'Trackr';
+const UNITS = 1000; // font size in path units; larger = more outline precision
+const TRACKING = 0.015 * UNITS; // gentle positive letter-spacing for a wordmark
+const OUT_HEIGHT = 128; // rendered PNG height in px (supersampled vs the 24dp Android target)
 
-// ---- Horizontal layout ----
-const MARGIN = 12; // left/right padding
-const GAP = 10; // spacing between letters
+// ---- Lay out the glyph outline with manual letter-spacing ----
+const font = opentype.parse(fs.readFileSync(FONT_PATH));
+const scale = UNITS / font.unitsPerEm;
 
-// ---- Primitive helpers ----
-function inRect(x, y, x0, y0, x1, y1) {
-  return x >= x0 && x < x1 && y >= y0 && y < y1;
+const outline = new opentype.Path();
+let penX = 0;
+const glyphs = font.stringToGlyphs(TEXT);
+glyphs.forEach((glyph, i) => {
+  const glyphPath = glyph.getPath(penX, 0, UNITS); // baseline at y = 0
+  outline.extend(glyphPath);
+  penX += glyph.advanceWidth * scale;
+  if (i < glyphs.length - 1) penX += TRACKING;
+});
+
+// Tight bounding box of the actual ink (Trackr has no descenders).
+const bb = outline.getBoundingBox();
+const inkW = bb.x2 - bb.x1;
+const inkH = bb.y2 - bb.y1;
+
+// Generous, optically even padding around the wordmark.
+const padY = inkH * 0.18;
+const padX = padY; // keep breathing room consistent on all sides
+const viewW = inkW + padX * 2;
+const viewH = inkH + padY * 2;
+
+const OUT_WIDTH = Math.round(OUT_HEIGHT * (viewW / viewH));
+
+// ---- Build the SVG (white fill) and rasterize with resvg ----
+const d = outline.toPathData(2);
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${viewW}" height="${viewH}" viewBox="${bb.x1 - padX} ${bb.y1 - padY} ${viewW} ${viewH}"><path d="${d}" fill="#FFFFFF"/></svg>`;
+
+const resvg = new Resvg(svg, {
+  fitTo: { mode: 'height', value: OUT_HEIGHT },
+  background: 'rgba(0,0,0,0)', // fully transparent canvas
+  shapeRendering: 2, // geometricPrecision
+});
+const rendered = resvg.render();
+const WIDTH = rendered.width;
+const HEIGHT = rendered.height;
+const pixels = Buffer.from(rendered.pixels); // straight-alpha RGBA
+
+// ---- Force every pixel to pure white, keep the coverage alpha as the mask ----
+for (let i = 0; i < pixels.length; i += 4) {
+  pixels[i] = 255;
+  pixels[i + 1] = 255;
+  pixels[i + 2] = 255;
+  // pixels[i + 3] (alpha) is the anti-aliased silhouette — leave untouched.
 }
 
-function inRing(x, y, cx, cy, rOut, rIn) {
-  const dx = x - cx;
-  const dy = y - cy;
-  const d2 = dx * dx + dy * dy;
-  return d2 <= rOut * rOut && d2 >= rIn * rIn;
-}
-
-// Squared distance from point to line segment a->b.
-function segDist2(x, y, ax, ay, bx, by) {
-  const vx = bx - ax;
-  const vy = by - ay;
-  const wx = x - ax;
-  const wy = y - ay;
-  let t = (wx * vx + wy * vy) / (vx * vx + vy * vy);
-  t = Math.max(0, Math.min(1, t));
-  const px = ax + t * vx;
-  const py = ay + t * vy;
-  const dx = x - px;
-  const dy = y - py;
-  return dx * dx + dy * dy;
-}
-
-function inSeg(x, y, ax, ay, bx, by, w) {
-  return segDist2(x, y, ax, ay, bx, by) <= (w / 2) * (w / 2);
-}
-
-// ---- Letterforms (ox = left x-origin of the glyph in output space) ----
-
-// "T": full-width top bar + centered stem.
-const W_T = 42;
-function inT(x, y, ox) {
-  if (inRect(x, y, ox, CAP_TOP, ox + W_T, CAP_TOP + STROKE)) return true;
-  const cx = ox + W_T / 2;
-  if (inRect(x, y, cx - STROKE / 2, CAP_TOP, cx + STROKE / 2, BASE)) return true;
-  return false;
-}
-
-// "r": x-height stem + rounded shoulder sweeping up and to the right.
-const R_SHOULDER = 15;
-const W_R = STROKE / 2 + R_SHOULDER; // stem center to arm tip
-function inR(x, y, ox) {
-  if (inRect(x, y, ox, X_TOP, ox + STROKE, BASE)) return true;
-  const cx = ox + STROKE / 2;
-  const cy = X_TOP + R_SHOULDER;
-  // Upper-right quarter annulus: from stem top curving out to the right arm.
-  if (inRing(x, y, cx, cy, R_SHOULDER, R_SHOULDER - STROKE) && y - cy <= 0 && x - cx >= 0) {
-    return true;
-  }
-  return false;
-}
-
-// "a": single-story geometric a — round bowl closed by a full-height right stem.
-const W_A = 2 * R_ROUND;
-function inA(x, y, ox) {
-  const cx = ox + R_ROUND;
-  if (inRing(x, y, cx, X_MID, R_ROUND, R_ROUND - STROKE)) return true;
-  if (inRect(x, y, ox + 2 * R_ROUND - STROKE, X_TOP, ox + 2 * R_ROUND, BASE)) return true;
-  return false;
-}
-
-// "c": open ring with the right side cut away.
-const W_C = 2 * R_ROUND;
-function inC(x, y, ox) {
-  const cx = ox + R_ROUND;
-  if (!inRing(x, y, cx, X_MID, R_ROUND, R_ROUND - STROKE)) return false;
-  const dx = x - cx;
-  const dy = y - X_MID;
-  if (dx > 0 && Math.abs(dy) < R_ROUND * 0.6) return false; // mouth opening
-  return true;
-}
-
-// "k": full-height stem + upper arm and lower leg meeting at an elbow.
-const K_REACH = 24;
-const W_K = STROKE + K_REACH;
-function inK(x, y, ox) {
-  if (inRect(x, y, ox, CAP_TOP, ox + STROKE, BASE)) return true;
-  const ex = ox + STROKE - 2; // elbow sits on the stem's right edge
-  const ey = X_MID - 2;
-  if (inSeg(x, y, ex, ey, ox + STROKE + K_REACH, X_TOP, STROKE)) return true;
-  if (inSeg(x, y, ex, ey, ox + STROKE + K_REACH, BASE, STROKE)) return true;
-  return false;
-}
-
-// ---- Compose the wordmark: T r a c k r ----
-const letters = [
-  { w: W_T, fn: inT },
-  { w: W_R, fn: inR },
-  { w: W_A, fn: inA },
-  { w: W_C, fn: inC },
-  { w: W_K, fn: inK },
-  { w: W_R, fn: inR },
-];
-
-const glyphs = [];
-let cursor = MARGIN;
-for (const l of letters) {
-  const ox = cursor;
-  glyphs.push((x, y) => l.fn(x, y, ox));
-  cursor += l.w + GAP;
-}
-const WIDTH = cursor - GAP + MARGIN;
-
-function inGlyph(x, y) {
-  for (const g of glyphs) if (g(x, y)) return true;
-  return false;
-}
-
-// ---- Rasterize (supersampled coverage -> alpha) ----
-const buf = Buffer.alloc(WIDTH * HEIGHT * 4, 0); // RGBA, fully transparent
-
-function setPixel(x, y, a) {
-  const i = (y * WIDTH + x) * 4;
-  buf[i] = 255;
-  buf[i + 1] = 255;
-  buf[i + 2] = 255;
-  buf[i + 3] = a;
-}
-
-for (let y = 0; y < HEIGHT; y++) {
-  for (let x = 0; x < WIDTH; x++) {
-    let hits = 0;
-    for (let sy = 0; sy < SS; sy++) {
-      for (let sx = 0; sx < SS; sx++) {
-        const fx = x + (sx + 0.5) / SS;
-        const fy = y + (sy + 0.5) / SS;
-        if (inGlyph(fx, fy)) hits++;
-      }
-    }
-    if (hits > 0) setPixel(x, y, Math.round((255 * hits) / (SS * SS)));
-  }
-}
-
-// ---- PNG encoding ----
+// ---- Minimal PNG encoder (RGBA, no external deps) ----
 function crc32(data) {
   let c = ~0;
   for (let i = 0; i < data.length; i++) {
@@ -180,8 +102,7 @@ function crc32(data) {
 function chunk(type, data) {
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data.length, 0);
-  const typeBuf = Buffer.from(type, 'ascii');
-  const body = Buffer.concat([typeBuf, data]);
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
   const crc = Buffer.alloc(4);
   crc.writeUInt32BE(crc32(body), 0);
   return Buffer.concat([len, body, crc]);
@@ -191,7 +112,7 @@ const ihdr = Buffer.alloc(13);
 ihdr.writeUInt32BE(WIDTH, 0);
 ihdr.writeUInt32BE(HEIGHT, 4);
 ihdr[8] = 8; // bit depth
-ihdr[9] = 6; // color type RGBA
+ihdr[9] = 6; // color type: RGBA
 ihdr[10] = 0;
 ihdr[11] = 0;
 ihdr[12] = 0;
@@ -199,7 +120,7 @@ ihdr[12] = 0;
 const raw = Buffer.alloc(HEIGHT * (WIDTH * 4 + 1));
 for (let y = 0; y < HEIGHT; y++) {
   raw[y * (WIDTH * 4 + 1)] = 0; // filter: none
-  buf.copy(raw, y * (WIDTH * 4 + 1) + 1, y * WIDTH * 4, (y + 1) * WIDTH * 4);
+  pixels.copy(raw, y * (WIDTH * 4 + 1) + 1, y * WIDTH * 4, (y + 1) * WIDTH * 4);
 }
 const idat = zlib.deflateSync(raw, { level: 9 });
 
@@ -212,4 +133,4 @@ const png = Buffer.concat([
 
 const out = path.join(__dirname, '..', 'assets', 'images', 'notification-icon.png');
 fs.writeFileSync(out, png);
-console.log('Wrote', out, `${WIDTH}x${HEIGHT}`, png.length, 'bytes');
+console.log('Wrote', out, `${WIDTH}x${HEIGHT}`, png.length, 'bytes', `(font: Montserrat SemiBold)`);

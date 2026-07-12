@@ -119,6 +119,13 @@ export async function searchSales(q: string, limit = 20): Promise<SaleSearchRow[
   );
 }
 
+/** Total number of recorded sales. */
+export async function countSales(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM sales');
+  return row?.c ?? 0;
+}
+
 /** Sum of sale totals and COGS within [start, end). */
 export async function sumSales(start: string, end: string): Promise<{ revenue: number; cogs: number; count: number }> {
   const db = await getDb();
