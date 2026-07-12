@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -7,7 +7,6 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import { useEffect } from 'react';
 
 import { Duration, Ease } from '@/constants/motion';
 

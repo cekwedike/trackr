@@ -1,5 +1,3 @@
-import 'react-native-gesture-handler';
-
 import {
   DarkTheme as NavDark,
   DefaultTheme as NavLight,

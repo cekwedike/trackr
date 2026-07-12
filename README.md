@@ -17,6 +17,8 @@ A business tracker for SMEs — an account book, notebook and analytics tool in 
 - **Security** — local PIN + biometric app lock. Data never leaves the device.
 - **Backup** — export/import all data to a JSON file.
 
+
+
 ## Tech stack
 
 - Expo SDK 57, React Native, TypeScript, Expo Router (file-based navigation)
@@ -68,3 +70,4 @@ src/
   hooks/               theme + data-loading hooks
   lib/                 money, dates, profit engine, auth, notifications, backup
 ```
+

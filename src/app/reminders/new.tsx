@@ -21,7 +21,7 @@ export default function NewReminder() {
   const t = useTheme();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [due, setDue] = useState(new Date(Date.now() + 60 * 60 * 1000));
+  const [due, setDue] = useState(() => new Date(Date.now() + 60 * 60 * 1000));
   const [recurrence, setRecurrence] = useState<Recurrence>('none');
   const [recModal, setRecModal] = useState(false);
   const [saving, setSaving] = useState(false);

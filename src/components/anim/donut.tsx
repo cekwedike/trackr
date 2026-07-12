@@ -27,16 +27,16 @@ export function AllocationDonut({
   const circumference = 2 * Math.PI * r;
   const total = data.reduce((sum, d) => sum + (Number(d.percent) || 0), 0) || 1;
 
-  let acc = 0;
+  const fracs = data.map((d) => (Number(d.percent) || 0) / total);
+  const startFrac = fracs.map((_, i) => fracs.slice(0, i).reduce((sum, f) => sum + f, 0));
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size}>
         <Circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor} strokeWidth={stroke} fill="none" />
         {data.map((d, i) => {
-          const frac = (Number(d.percent) || 0) / total;
+          const frac = fracs[i];
           const len = frac * circumference;
-          const offset = -acc * circumference;
-          acc += frac;
+          const offset = -startFrac[i] * circumference;
           return (
             <Circle
               key={i}

@@ -130,11 +130,6 @@ export async function togglePinned(id: number, pinned: boolean): Promise<void> {
   await db.runAsync('UPDATE notes SET pinned = ?, updated_at = ? WHERE id = ?', [pinned ? 1 : 0, nowIso(), id]);
 }
 
-/** Alias for togglePinned with an explicit numeric flag, for call sites that hold `0 | 1`. */
-export async function setNotePinned(id: number, pinned: number): Promise<void> {
-  await togglePinned(id, pinned === 1);
-}
-
 /** Set (or clear, with null) the per-note color-theme key. Leaves updated_at untouched to avoid reordering. */
 export async function setNoteColor(id: number, color: string | null): Promise<void> {
   const db = await getDb();
@@ -181,17 +176,6 @@ export interface Backlink {
   id: number;
   source_note_id: number;
   source_title: string;
-}
-
-/** Notes that link to this note. */
-export async function getBacklinks(noteId: number): Promise<Backlink[]> {
-  const db = await getDb();
-  return db.getAllAsync<Backlink>(
-    `SELECT l.id, l.source_note_id, n.title AS source_title
-     FROM links l JOIN notes n ON n.id = l.source_note_id
-     WHERE l.target_type = 'note' AND l.target_id = ? ORDER BY n.title ASC`,
-    [noteId],
-  );
 }
 
 /** Notes that reference a given entity (product/sale/order/customer/expense). */

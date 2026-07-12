@@ -44,24 +44,6 @@ export async function createReminder(input: ReminderInput): Promise<number> {
   return res.lastInsertRowId;
 }
 
-export async function updateReminder(id: number, input: ReminderInput): Promise<void> {
-  const db = await getDb();
-  await db.runAsync(
-    `UPDATE reminders SET title = ?, body = ?, due_at = ?, recurrence = ?, notification_id = ?, target_type = ?, target_id = ?, updated_at = ? WHERE id = ?`,
-    [
-      input.title,
-      input.body ?? null,
-      input.due_at,
-      input.recurrence,
-      input.notification_id ?? null,
-      input.target_type ?? null,
-      input.target_id ?? null,
-      nowIso(),
-      id,
-    ],
-  );
-}
-
 export async function setReminderCompleted(id: number, completed: boolean): Promise<void> {
   const db = await getDb();
   await db.runAsync('UPDATE reminders SET completed = ?, updated_at = ? WHERE id = ?', [completed ? 1 : 0, nowIso(), id]);

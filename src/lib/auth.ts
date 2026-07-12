@@ -15,11 +15,6 @@ async function hashPin(pin: string, salt: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${pin}`);
 }
 
-export async function hasPin(): Promise<boolean> {
-  const hash = await SecureStore.getItemAsync(PIN_HASH_KEY);
-  return !!hash;
-}
-
 export async function setPin(pin: string): Promise<void> {
   const saltBytes = await Crypto.getRandomBytesAsync(16);
   const salt = bytesToHex(saltBytes);

@@ -10,7 +10,6 @@ export function useAsyncData<T>(loader: () => Promise<T>, deps: unknown[] = []) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const load = useCallback(async () => {
     try {
       setError(null);

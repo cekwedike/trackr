@@ -17,9 +17,6 @@
  *  - Backup export (expo-sharing): opens the system share sheet only.
  *  - Backup import (expo-document-picker): opens the system document UI only.
  */
-import * as ImagePicker from 'expo-image-picker';
-import { Alert, Linking } from 'react-native';
-
 import { hasNotificationPermission, requestNotificationPermission } from '@/lib/notifications';
 
 export type PermissionOutcome = 'granted' | 'denied' | 'blocked';
@@ -36,11 +33,6 @@ export const PermissionRationale = {
   },
 } as const;
 
-/** Open the OS settings page for Trackr, for when a permission is blocked. */
-export function openAppSettings(): void {
-  Linking.openSettings().catch(() => {});
-}
-
 /**
  * Ensure notification permission, prompting once if needed. Creates the Android
  * channel as part of the flow so notifications render as branded alerts.
@@ -49,30 +41,4 @@ export async function requestNotifications(): Promise<PermissionOutcome> {
   if (await hasNotificationPermission()) return 'granted';
   const granted = await requestNotificationPermission();
   return granted ? 'granted' : 'denied';
-}
-
-/** Request photo-library access before opening the image picker. */
-export async function requestPhotoLibrary(): Promise<PermissionOutcome> {
-  const current = await ImagePicker.getMediaLibraryPermissionsAsync();
-  if (current.granted) return 'granted';
-  if (!current.canAskAgain) return 'blocked';
-  const res = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (res.granted) return 'granted';
-  return res.canAskAgain ? 'denied' : 'blocked';
-}
-
-/**
- * Convenience wrapper: request photo access and, if it was permanently blocked,
- * offer to open Settings. Returns whether access is granted.
- */
-export async function ensurePhotoLibraryAccess(): Promise<boolean> {
-  const outcome = await requestPhotoLibrary();
-  if (outcome === 'granted') return true;
-  if (outcome === 'blocked') {
-    Alert.alert(PermissionRationale.photos.title, `${PermissionRationale.photos.message}\n\nYou can enable it in Settings.`, [
-      { text: 'Not now', style: 'cancel' },
-      { text: 'Open Settings', onPress: openAppSettings },
-    ]);
-  }
-  return false;
 }

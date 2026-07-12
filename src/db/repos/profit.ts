@@ -52,8 +52,3 @@ export async function countProfitRecords(): Promise<number> {
   const row = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) AS c FROM profit_records');
   return row?.c ?? 0;
 }
-
-export async function deleteProfitRecord(month: string): Promise<void> {
-  const db = await getDb();
-  await db.runAsync('DELETE FROM profit_records WHERE month = ?', [month]);
-}

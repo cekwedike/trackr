@@ -13,10 +13,9 @@ import Animated, {
   useReducedMotion,
   useSharedValue,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 
-import { Duration, Ease, Spring } from '@/constants/motion';
+import { Spring } from '@/constants/motion';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
