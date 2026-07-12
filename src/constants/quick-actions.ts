@@ -1,7 +1,7 @@
 import type { Href } from 'expo-router';
 
 import type { IconName } from '@/components/ui';
-import type { IndustryTerms, QuickActionKey } from '@/constants/industries';
+import type { IndustryModules, IndustryTerms, QuickActionKey } from '@/constants/industries';
 
 /** Shared metadata for every quick action, used by the dashboard grid and the movable FAB. */
 export const QUICK_ACTION_META: Record<QuickActionKey, { icon: IconName; href: Href; label: (t: IndustryTerms) => string }> = {
@@ -14,3 +14,26 @@ export const QUICK_ACTION_META: Record<QuickActionKey, { icon: IconName; href: H
   reminder: { icon: 'alarm', href: '/reminders/new' as Href, label: () => 'Reminder' },
   recipe: { icon: 'reader', href: '/recipes/new' as Href, label: (t) => `New ${t.productionLabel.toLowerCase().replace(/s$/, '')}` },
 };
+
+/**
+ * The industry feature module each quick action depends on. Actions mapped to
+ * `null` are universal (always available regardless of industry configuration).
+ * Used to filter the FAB candidate list and defaults down to what the current
+ * industry actually supports (see `useFabActions` / `useQuickActionCandidates`).
+ */
+export const QUICK_ACTION_MODULE: Record<QuickActionKey, keyof IndustryModules | null> = {
+  sale: 'sales',
+  order: 'orders',
+  product: 'inventory',
+  customer: 'customers',
+  recipe: 'recipes',
+  expense: null,
+  profit: null,
+  reminder: null,
+};
+
+/** Whether a quick action is relevant for an industry given its enabled modules. */
+export function isQuickActionAvailable(key: QuickActionKey, modules: IndustryModules): boolean {
+  const mod = QUICK_ACTION_MODULE[key];
+  return mod === null || modules[mod];
+}

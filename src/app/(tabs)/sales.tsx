@@ -1,10 +1,9 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
-import { FadeSlide, SkeletonList } from '@/components/anim';
+import { SkeletonList } from '@/components/anim';
 import { MovableFab } from '@/components/nav';
-import { AppHeader, Card, Chip, EmptyState, ListRow, Screen, Text } from '@/components/ui';
-import { Spacing } from '@/constants/theme';
+import { AppHeader, CardList, Chip, EmptyState, ListRow, Screen, Text } from '@/components/ui';
 import { useApp } from '@/context/app-context';
 import { listSales } from '@/db/repos/sales';
 import { useAsyncData } from '@/hooks/use-async-data';
@@ -36,26 +35,25 @@ export default function SalesScreen() {
         {!data ? (
           <SkeletonList rows={7} />
         ) : data.length > 0 ? (
-          <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
-            {data.map((s, idx) => (
-              <FadeSlide key={s.id} delay={Math.min(idx * 45, 360)}>
-                <ListRow
-                  icon="cart"
-                  iconTone="success"
-                  title={s.customer_name ? `${s.customer_name}` : `${terms.sale} #${s.id}`}
-                  subtitle={`${formatDateTime(s.occurred_at)} · ${s.item_count} item(s)`}
-                  onPress={() => router.push(`/sales/${s.id}`)}
-                  right={
-                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                      <Text variant="body" weight="bold" color={t.success}>{money(s.total)}</Text>
-                      <Chip label={METHOD_LABEL[s.payment_method] ?? s.payment_method} tone={s.payment_method === 'credit' ? 'warning' : 'default'} />
-                    </View>
-                  }
-                />
-                {idx < data.length - 1 ? <View style={{ height: 1, backgroundColor: t.border }} /> : null}
-              </FadeSlide>
-            ))}
-          </Card>
+          <CardList
+            data={data}
+            keyExtractor={(s) => s.id}
+            renderItem={(s) => (
+              <ListRow
+                icon="cart"
+                iconTone="success"
+                title={s.customer_name ? `${s.customer_name}` : `${terms.sale} #${s.id}`}
+                subtitle={`${formatDateTime(s.occurred_at)} · ${s.item_count} item(s)`}
+                onPress={() => router.push(`/sales/${s.id}`)}
+                right={
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <Text variant="body" weight="bold" color={t.success}>{money(s.total)}</Text>
+                    <Chip label={METHOD_LABEL[s.payment_method] ?? s.payment_method} tone={s.payment_method === 'credit' ? 'warning' : 'default'} />
+                  </View>
+                }
+              />
+            )}
+          />
         ) : (
           <EmptyState
             icon="cart-outline"

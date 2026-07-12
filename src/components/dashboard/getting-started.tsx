@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -114,7 +114,7 @@ export function GettingStarted() {
                     )
                   }
                 />
-                {idx < items.length - 1 ? <View style={{ height: 1, backgroundColor: t.border }} /> : null}
+                {idx < items.length - 1 ? <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: t.border, marginLeft: 54 }} /> : null}
               </View>
             ))}
           </View>

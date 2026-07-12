@@ -2,16 +2,15 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { FadeSlide, SkeletonList } from '@/components/anim';
+import { SkeletonList } from '@/components/anim';
 import { MovableFab } from '@/components/nav';
-import { AppHeader, Card, Chip, EmptyState, ListRow, Screen, Segmented } from '@/components/ui';
+import { AppHeader, CardList, Chip, EmptyState, ListRow, Screen, Segmented } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listOrders } from '@/db/repos/orders';
 import type { OrderStatus } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useQuickActionCandidates } from '@/hooks/use-fab-actions';
-import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/lib/date';
 
 const STATUS_TONE: Record<OrderStatus, 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info'> = {
@@ -30,7 +29,6 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 };
 
 export default function OrdersScreen() {
-  const t = useTheme();
   const { money, terms } = useApp();
   const [filter, setFilter] = useState<'active' | 'all'>('active');
   const { data } = useAsyncData(() => listOrders(), []);
@@ -48,24 +46,23 @@ export default function OrdersScreen() {
         {!data ? (
           <SkeletonList rows={6} />
         ) : orders.length > 0 ? (
-          <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
-            {orders.map((o, idx) => {
+          <CardList
+            data={orders}
+            keyExtractor={(o) => o.id}
+            renderItem={(o) => {
               const balance = o.total - o.amount_paid;
               return (
-                <FadeSlide key={o.id} delay={Math.min(idx * 45, 360)}>
-                  <ListRow
-                    icon="clipboard"
-                    iconTone={STATUS_TONE[o.status]}
-                    title={o.customer_name || `${terms.order} #${o.id}`}
-                    subtitle={`${money(o.total)}${balance > 0 ? ` · ${money(balance)} due` : ' · paid'}${o.due_at ? ` · due ${formatDate(o.due_at)}` : ''}`}
-                    onPress={() => router.push(`/orders/${o.id}`)}
-                    right={<Chip label={STATUS_LABEL[o.status]} tone={STATUS_TONE[o.status]} />}
-                  />
-                  {idx < orders.length - 1 ? <View style={{ height: 1, backgroundColor: t.border }} /> : null}
-                </FadeSlide>
+                <ListRow
+                  icon="clipboard"
+                  iconTone={STATUS_TONE[o.status]}
+                  title={o.customer_name || `${terms.order} #${o.id}`}
+                  subtitle={`${money(o.total)}${balance > 0 ? ` · ${money(balance)} due` : ' · paid'}${o.due_at ? ` · due ${formatDate(o.due_at)}` : ''}`}
+                  onPress={() => router.push(`/orders/${o.id}`)}
+                  right={<Chip label={STATUS_LABEL[o.status]} tone={STATUS_TONE[o.status]} />}
+                />
               );
-            })}
-          </Card>
+            }}
+          />
         ) : (
           <EmptyState
             icon="clipboard-outline"

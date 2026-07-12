@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { RecipeForm } from '@/components/forms/recipe-form';
-import { AppHeader, Card, Chip, Divider, IconButton, Screen, SectionHeader, Text, TextField } from '@/components/ui';
+import { AppHeader, Card, Chip, DetailHero, Divider, IconButton, InfoRow, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
@@ -62,32 +62,41 @@ export default function RecipeDetail() {
     <Screen>
       <AppHeader title={recipe.name} back right={<IconButton icon="create-outline" tone="primary" onPress={() => setEditing(true)} />} />
 
-      <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text variant="caption" color={t.textSecondary}>Cost per unit</Text>
-          <Text variant="title" color={t.primary}>{money(perUnit)}</Text>
-        </View>
+      <DetailHero
+        label="Cost per unit"
+        value={money(perUnit)}
+        valueColor={t.primary}
+        icon="reader"
+        tone="primary"
+        meta={`Yields ${formatQty(recipe.yield_qty)} units · batch ${money(batchCost)}`}
+      />
+
+      <SectionHeader title="Costing" />
+      <Card style={{ marginBottom: Spacing.lg }}>
+        <InfoRow label="Yield" value={`${formatQty(recipe.yield_qty)} units`} />
         <Divider />
-        <Row label="Yield" value={`${formatQty(recipe.yield_qty)} units`} />
-        <Row label="Batch cost" value={money(batchCost)} />
+        <InfoRow label="Batch cost" value={money(batchCost)} />
         {product ? (
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text variant="caption" color={t.textSecondary}>Profit / unit (sells {money(product.price)})</Text>
-            <Chip label={money(product.price - perUnit)} tone={product.price - perUnit >= 0 ? 'success' : 'danger'} />
-          </View>
+          <>
+            <Divider />
+            <InfoRow
+              label={`Profit / unit (sells ${money(product.price)})`}
+              right={<Chip label={money(product.price - perUnit)} tone={product.price - perUnit >= 0 ? 'success' : 'danger'} />}
+            />
+          </>
         ) : null}
       </Card>
 
-      <SectionHeader title="Ingredients" />
+      <SectionHeader title="Ingredients" subtitle={items.length ? `${items.length} used` : undefined} />
       <Card>
         {items.map((it, idx) => (
           <View key={it.id}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.md, gap: Spacing.md }}>
               <View style={{ flex: 1 }}>
-                <Text variant="body" weight="medium">{it.name}</Text>
+                <Text variant="body" weight="semibold">{it.name}</Text>
                 <Text variant="caption" color={t.textSecondary}>{formatQty(it.qty)} {it.unit ?? ''} · {money(it.unitCost)}/{it.unit ?? 'unit'}</Text>
               </View>
-              <Text variant="body" weight="semibold">{money(it.lineCost)}</Text>
+              <Text variant="body" weight="bold">{money(it.lineCost)}</Text>
             </View>
             {idx < items.length - 1 ? <Divider /> : null}
           </View>
@@ -118,20 +127,10 @@ export default function RecipeDetail() {
 
       {recipe.notes ? (
         <>
-          <SectionHeader title="Notes" />
+          <SectionHeader title="Notes" style={{ marginTop: Spacing.lg }} />
           <Card><Text variant="body" color={t.textSecondary}>{recipe.notes}</Text></Card>
         </>
       ) : null}
     </Screen>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  const t = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-      <Text variant="caption" color={t.textSecondary}>{label}</Text>
-      <Text variant="body" weight="medium">{value}</Text>
-    </View>
   );
 }

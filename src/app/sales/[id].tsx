@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
-import { AppHeader, Button, Card, Chip, Divider, IconButton, Screen, SectionHeader, Text } from '@/components/ui';
+import { AppHeader, Button, Card, Chip, DetailHero, Divider, IconButton, InfoRow, Screen, SectionHeader, Text } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { deleteSale, getSale, getSaleItems } from '@/db/repos/sales';
@@ -76,37 +76,48 @@ export default function SaleDetail() {
     printReceipt(buildData());
   };
 
+  const detailRows = [
+    <InfoRow key="date" label="Date" value={formatDateTime(sale.occurred_at)} />,
+    <InfoRow key="pay" label="Payment" value={PAYMENT_LABEL[sale.payment_method] ?? sale.payment_method} />,
+    customer ? <InfoRow key="cust" label="Customer" value={customer.name} onPress={() => router.push(`/customers/${customer.id}`)} /> : null,
+    <InfoRow key="cogs" label="Est. cost (COGS)" value={money(sale.cost_total)} />,
+    <InfoRow key="profit" label="Est. profit" right={<Chip label={money(profit)} tone={profit >= 0 ? 'success' : 'danger'} />} />,
+    sale.note ? <InfoRow key="note" label="Note" value={sale.note} align="flex-start" /> : null,
+  ].filter(Boolean);
+
   return (
     <Screen>
       <AppHeader title={`Sale #${sale.id}`} back right={<IconButton icon="trash-outline" tone="danger" onPress={remove} />} />
 
-      <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text variant="caption" color={t.textSecondary}>Total</Text>
-          <Text variant="title" color={t.success}>{money(sale.total)}</Text>
-        </View>
-        <Divider />
-        <Row label="Date" value={formatDateTime(sale.occurred_at)} />
-        <Row label="Payment" value={sale.payment_method} />
-        {customer ? <Row label="Customer" value={customer.name} /> : null}
-        <Row label="Est. cost (COGS)" value={money(sale.cost_total)} />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text variant="caption" color={t.textSecondary}>Est. profit</Text>
-          <Chip label={money(profit)} tone={profit >= 0 ? 'success' : 'danger'} />
-        </View>
-        {sale.note ? <Row label="Note" value={sale.note} /> : null}
+      <DetailHero
+        label="Total sale"
+        value={money(sale.total)}
+        valueColor={t.success}
+        icon="cart"
+        tone="success"
+        meta={`${items.length} item${items.length === 1 ? '' : 's'} · ${formatDateTime(sale.occurred_at)}`}
+      />
+
+      <SectionHeader title="Details" />
+      <Card style={{ marginBottom: Spacing.lg }}>
+        {detailRows.map((row, idx) => (
+          <View key={idx}>
+            {row}
+            {idx < detailRows.length - 1 ? <Divider /> : null}
+          </View>
+        ))}
       </Card>
 
-      <SectionHeader title="Items" />
+      <SectionHeader title="Items" subtitle={`${items.length} line item${items.length === 1 ? '' : 's'}`} />
       <Card>
         {items.map((it, idx) => (
           <View key={it.id}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.md, gap: Spacing.md }}>
               <View style={{ flex: 1 }}>
-                <Text variant="body" weight="medium">{it.name}</Text>
+                <Text variant="body" weight="semibold">{it.name}</Text>
                 <Text variant="caption" color={t.textSecondary}>{it.qty} × {money(it.unit_price)}</Text>
               </View>
-              <Text variant="body" weight="semibold">{money(it.line_total)}</Text>
+              <Text variant="body" weight="bold">{money(it.line_total)}</Text>
             </View>
             {idx < items.length - 1 ? <Divider /> : null}
           </View>
@@ -123,12 +134,11 @@ export default function SaleDetail() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  const t = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-      <Text variant="caption" color={t.textSecondary}>{label}</Text>
-      <Text variant="body" weight="medium" style={{ flexShrink: 1, textAlign: 'right', marginLeft: Spacing.md }}>{value}</Text>
-    </View>
-  );
-}
+const PAYMENT_LABEL: Record<string, string> = {
+  cash: 'Cash',
+  transfer: 'Transfer',
+  card: 'Card',
+  pos: 'POS',
+  credit: 'Credit',
+  other: 'Other',
+};

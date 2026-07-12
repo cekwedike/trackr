@@ -384,7 +384,7 @@ function LowStockAlerts({ data }: WidgetProps) {
 
   return (
     <>
-      <SectionHeader title={`${terms.inventoryLabel} alerts`} action="Manage" onAction={() => router.push('/products' as Href)} />
+      <SectionHeader title={`${terms.inventoryLabel} alerts`} action="Manage" onAction={() => router.push('/inventory' as Href)} />
       <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
         {items.length === 0 ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>

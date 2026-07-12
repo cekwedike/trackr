@@ -28,10 +28,12 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PressableScale } from '@/components/anim/pressable';
+import { FadeSlide } from '@/components/anim/stagger';
 import { Duration, Ease, PressScale, Spring } from '@/constants/motion';
-import { FontSize, FontWeight, MaxContentWidth, Radius, Shadow, Spacing, type ThemeColors } from '@/constants/theme';
+import { FontSize, FontWeight, LineHeight, MaxContentWidth, Radius, Shadow, Spacing, type ThemeColors } from '@/constants/theme';
+import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
-import { shade } from '@/lib/color';
+import { hexToRgba, shade } from '@/lib/color';
 import { selectionFeedback } from '@/lib/haptics';
 
 const APP_ICON = require('../../assets/images/icon.png');
@@ -159,12 +161,12 @@ export function Text({
   const t = useTheme();
   const base: TextStyle = { color: color ?? t.text };
   const variants: Record<TextVariant, TextStyle> = {
-    display: { fontSize: FontSize.xxxl, fontWeight: FontWeight.bold, letterSpacing: -0.5 },
-    title: { fontSize: FontSize.xxl, fontWeight: FontWeight.bold, letterSpacing: -0.3 },
-    subtitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
-    body: { fontSize: FontSize.md, fontWeight: FontWeight.regular },
-    label: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
-    caption: { fontSize: FontSize.xs, fontWeight: FontWeight.medium, color: t.textSecondary },
+    display: { fontSize: FontSize.xxxl, lineHeight: LineHeight.xxxl, fontWeight: FontWeight.bold, letterSpacing: -0.7 },
+    title: { fontSize: FontSize.xxl, lineHeight: LineHeight.xxl, fontWeight: FontWeight.bold, letterSpacing: -0.4 },
+    subtitle: { fontSize: FontSize.lg, lineHeight: LineHeight.lg, fontWeight: FontWeight.semibold, letterSpacing: -0.2 },
+    body: { fontSize: FontSize.md, lineHeight: LineHeight.md, fontWeight: FontWeight.regular },
+    label: { fontSize: FontSize.sm, lineHeight: LineHeight.sm, fontWeight: FontWeight.semibold },
+    caption: { fontSize: FontSize.xs, lineHeight: LineHeight.xs, fontWeight: FontWeight.medium, color: t.textSecondary },
   };
   const w = weight ? { fontWeight: FontWeight[weight] } : null;
   return (
@@ -650,30 +652,206 @@ export function ListRow({
   );
 }
 
+// ---------- CardList ----------
+/**
+ * Renders a list of items inside a single elevated Card with hairline dividers
+ * and a subtle staggered entrance — the canonical way to present a scannable list.
+ */
+export function CardList<T>({
+  data,
+  keyExtractor,
+  renderItem,
+  stagger = true,
+  style,
+}: {
+  data: T[];
+  keyExtractor: (item: T, index: number) => string | number;
+  renderItem: (item: T, index: number) => React.ReactNode;
+  stagger?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const t = useTheme();
+  return (
+    <Card padded={false} style={[{ paddingHorizontal: Spacing.lg }, style]}>
+      {data.map((item, idx) => {
+        const row = (
+          <>
+            {renderItem(item, idx)}
+            {idx < data.length - 1 ? (
+              <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: t.border, marginLeft: 54 }} />
+            ) : null}
+          </>
+        );
+        const key = keyExtractor(item, idx);
+        return stagger ? (
+          <FadeSlide key={key} delay={Math.min(idx * 40, 320)}>{row}</FadeSlide>
+        ) : (
+          <View key={key}>{row}</View>
+        );
+      })}
+    </Card>
+  );
+}
+
+// ---------- InfoRow ----------
+/** A consistent key / value row for detail screens. Value is emphasized on the right. */
+export function InfoRow({
+  label,
+  value,
+  valueColor,
+  icon,
+  iconTone = 'default',
+  onPress,
+  right,
+  align = 'center',
+}: {
+  label: string;
+  value?: string;
+  valueColor?: string;
+  icon?: IconName;
+  iconTone?: Tone;
+  onPress?: () => void;
+  right?: React.ReactNode;
+  align?: 'center' | 'flex-start';
+}) {
+  const t = useTheme();
+  const c = icon ? toneColor(t, iconTone) : null;
+  const inner = (
+    <View style={{ flexDirection: 'row', alignItems: align, gap: Spacing.md, paddingVertical: Spacing.md }}>
+      {icon && c ? (
+        <View style={{ width: 34, height: 34, borderRadius: Radius.sm, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={icon} size={17} color={c.fg} />
+        </View>
+      ) : null}
+      <Text variant="body" color={t.textSecondary} style={{ paddingTop: align === 'flex-start' ? 1 : 0 }}>{label}</Text>
+      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+        {right ?? (
+          <Text variant="body" weight="semibold" color={valueColor} style={{ textAlign: 'right' }}>{value}</Text>
+        )}
+      </View>
+      {onPress ? <Ionicons name="chevron-forward" size={16} color={t.textMuted} /> : null}
+    </View>
+  );
+  if (onPress) {
+    return (
+      <PressableScale onPress={onPress} scaleTo={PressScale.row} opacityTo={0.7}>
+        {inner}
+      </PressableScale>
+    );
+  }
+  return inner;
+}
+
+// ---------- DetailHero ----------
+/** A prominent summary block for the top of a detail screen: label, big value, optional badge + meta. */
+export function DetailHero({
+  label,
+  value,
+  valueColor,
+  icon,
+  tone = 'primary',
+  badge,
+  badgeTone,
+  meta,
+  style,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+  icon?: IconName;
+  tone?: Tone;
+  badge?: string;
+  badgeTone?: Tone;
+  meta?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const t = useTheme();
+  const c = toneColor(t, tone);
+  return (
+    <Card style={[{ gap: Spacing.md, marginBottom: Spacing.lg }, style]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text variant="label" color={t.textSecondary} style={{ letterSpacing: 0.7 }}>{label.toUpperCase()}</Text>
+        {icon ? (
+          <View style={{ width: 44, height: 44, borderRadius: Radius.md, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name={icon} size={22} color={c.fg} />
+          </View>
+        ) : null}
+      </View>
+      <Text variant="display" color={valueColor} numberOfLines={1}>{value}</Text>
+      {badge || meta ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          {badge ? <Chip label={badge} tone={badgeTone ?? tone} /> : null}
+          {meta ? <Text variant="caption" color={t.textMuted} style={{ flex: 1 }} numberOfLines={1}>{meta}</Text> : null}
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+
 // ---------- EmptyState ----------
 export function EmptyState({
   icon = 'sparkles-outline',
   title,
   message,
   actionLabel,
+  actionIcon = 'add',
   onAction,
+  secondaryLabel,
+  onSecondary,
 }: {
   icon?: IconName;
   title: string;
   message?: string;
   actionLabel?: string;
+  actionIcon?: IconName;
   onAction?: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
 }) {
   const t = useTheme();
+  const { accent } = useApp();
   return (
-    <View style={{ alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.xxxl }}>
-      <View style={{ width: 72, height: 72, borderRadius: Radius.pill, backgroundColor: t.cardAlt, alignItems: 'center', justifyContent: 'center' }}>
-        <Ionicons name={icon} size={32} color={t.textMuted} />
+    <FadeSlide style={{ alignItems: 'center', paddingVertical: Spacing.xxxl, paddingHorizontal: Spacing.lg }}>
+      {/* Layered medallion: soft outer halo + tinted inner disc for a designed, branded feel */}
+      <View
+        style={{
+          width: 104,
+          height: 104,
+          borderRadius: Radius.pill,
+          backgroundColor: hexToRgba(accent, 0.07),
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: Spacing.lg,
+        }}
+      >
+        <View
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: Radius.pill,
+            backgroundColor: hexToRgba(accent, 0.14),
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name={icon} size={34} color={accent} />
+        </View>
       </View>
-      <Text variant="subtitle">{title}</Text>
-      {message ? <Text variant="body" color={t.textSecondary} style={{ textAlign: 'center', maxWidth: 280 }}>{message}</Text> : null}
-      {actionLabel && onAction ? <Button title={actionLabel} onPress={onAction} icon="add" style={{ marginTop: Spacing.sm }} /> : null}
-    </View>
+      <Text variant="title" style={{ textAlign: 'center' }}>{title}</Text>
+      {message ? (
+        <Text variant="body" color={t.textSecondary} style={{ textAlign: 'center', maxWidth: 300, marginTop: Spacing.sm }}>
+          {message}
+        </Text>
+      ) : null}
+      {actionLabel && onAction ? (
+        <Button title={actionLabel} onPress={onAction} icon={actionIcon} style={{ marginTop: Spacing.xl, alignSelf: 'stretch', maxWidth: 300 }} />
+      ) : null}
+      {secondaryLabel && onSecondary ? (
+        <Pressable onPress={onSecondary} hitSlop={8} style={{ marginTop: Spacing.md }}>
+          <Text variant="label" color={t.primary}>{secondaryLabel}</Text>
+        </Pressable>
+      ) : null}
+    </FadeSlide>
   );
 }
 
@@ -712,11 +890,31 @@ export function FAB({ icon = 'add', onPress, label }: { icon?: IconName; onPress
 }
 
 // ---------- SectionHeader ----------
-export function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+export function SectionHeader({
+  title,
+  subtitle,
+  icon,
+  action,
+  onAction,
+  style,
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: IconName;
+  action?: string;
+  onAction?: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm }}>
-      <Text variant="label" color={t.textSecondary}>{title.toUpperCase()}</Text>
+    <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: Spacing.sm, gap: Spacing.md }, style]}>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {icon ? <Ionicons name={icon} size={13} color={t.textMuted} /> : null}
+        <View style={{ flex: 1 }}>
+          <Text variant="label" color={t.textSecondary} style={{ letterSpacing: 0.7 }}>{title.toUpperCase()}</Text>
+          {subtitle ? <Text variant="caption" color={t.textMuted} style={{ marginTop: 2 }}>{subtitle}</Text> : null}
+        </View>
+      </View>
       {action && onAction ? (
         <Pressable onPress={onAction} hitSlop={8}>
           <Text variant="label" color={t.primary}>{action}</Text>

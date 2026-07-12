@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, View, type ColorValue } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -103,30 +103,47 @@ function TabItem({
 
 /**
  * Custom animated bottom tab bar: a spring-driven moving pill behind the active
- * tab, icon scale/bounce on focus, animated labels and a press ripple. Respects
- * the per-industry tab gating (only routes present in `state.routes` render) and
- * the Android nav-bar safe-area spacing.
+ * tab, icon scale/bounce on focus, animated labels and a press ripple.
+ *
+ * Per-industry tab gating happens HERE: expo-router does not remove `href: null`
+ * routes from `state.routes` when a custom `tabBar` is supplied, so all registered
+ * screens arrive in `state.routes`. We filter them against a per-industry allowlist
+ * (`index` + the industry's `navTabs` + `more`, always hiding `notes`) so the bar
+ * shows at most 4 items. Respects the Android nav-bar safe-area spacing.
  */
 export function AnimatedTabBar({ state, descriptors, navigation, insets }: AnimatedTabBarProps) {
   const t = useTheme();
-  const { accent } = useApp();
+  const { accent, industry } = useApp();
   const reduced = useReducedMotion();
   const [rowW, setRowW] = useState(0);
 
-  const count = state.routes.length;
+  // Allowlist: Home first, up to 2 industry entity tabs, More last. `notes` and any
+  // entity tab not in this industry's `navTabs` are always excluded.
+  const allowed = useMemo(() => new Set<string>(['index', ...industry.navTabs, 'more']), [industry.navTabs]);
+  const routes = useMemo(() => state.routes.filter((r) => allowed.has(r.name)), [state.routes, allowed]);
+
+  const count = routes.length;
   const itemW = count > 0 ? rowW / count : 0;
   const pillW = itemW > 0 ? Math.max(44, Math.min(64, itemW - Spacing.md)) : 0;
-  const pos = useSharedValue(state.index);
+
+  // `state.index` indexes the FULL routes array; map the focused route into the
+  // filtered list. -1 means the active route is hidden (e.g. `notes`) → no pill.
+  const focusedRoute = state.routes[state.index];
+  const focusedIndex = focusedRoute ? routes.findIndex((r) => r.key === focusedRoute.key) : -1;
+
+  const pos = useSharedValue(Math.max(0, focusedIndex));
 
   useEffect(() => {
+    if (focusedIndex < 0) return;
     pos.value = reduced
-      ? withTiming(state.index, { duration: Duration.base, easing: Ease.standard })
-      : withSpring(state.index, Spring.snappy);
-  }, [state.index, reduced, pos]);
+      ? withTiming(focusedIndex, { duration: Duration.base, easing: Ease.standard })
+      : withSpring(focusedIndex, Spring.snappy);
+  }, [focusedIndex, reduced, pos]);
 
+  const showPill = focusedIndex >= 0;
   const pillStyle = useAnimatedStyle(() => ({
     width: itemW,
-    opacity: itemW > 0 ? 1 : 0,
+    opacity: itemW > 0 && showPill ? 1 : 0,
     transform: [{ translateX: pos.value * itemW }],
   }));
 
@@ -161,10 +178,10 @@ export function AnimatedTabBar({ state, descriptors, navigation, insets }: Anima
           </Animated.View>
         </Animated.View>
 
-        {state.routes.map((route, index) => {
+        {routes.map((route, index) => {
           const descriptor = descriptors[route.key];
           const options = descriptor?.options ?? {};
-          const focused = state.index === index;
+          const focused = focusedIndex === index;
           const label = options.title ?? route.name;
 
           const onPress = () => {

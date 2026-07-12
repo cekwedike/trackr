@@ -12,6 +12,9 @@ import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
 import { hexToRgba } from '@/lib/color';
 
+const HANDLE_WIDTH = 40;
+const HANDLE_HEIGHT = 5;
+
 /**
  * Lightweight bottom sheet built on gesture-handler + reanimated.
  * Slides up over a dimmed backdrop and can be swiped down to dismiss. Themed to
@@ -95,7 +98,11 @@ export function Sheet({
                   backgroundColor: t.card,
                   borderTopLeftRadius: Radius.xl,
                   borderTopRightRadius: Radius.xl,
-                  paddingTop: Spacing.sm,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderLeftWidth: StyleSheet.hairlineWidth,
+                  borderRightWidth: StyleSheet.hairlineWidth,
+                  borderColor: t.border,
+                  paddingTop: Spacing.md,
                   paddingBottom: insets.bottom + Spacing.lg,
                   paddingHorizontal: Spacing.lg,
                   ...Shadow.lg,
@@ -103,41 +110,55 @@ export function Sheet({
                 sheetStyle,
               ]}
             >
-              <View
-                style={{
-                  alignSelf: 'center',
-                  width: 44,
-                  height: 5,
-                  borderRadius: 3,
-                  backgroundColor: accent ? hexToRgba(accentColor, 0.55) : t.borderStrong,
-                  marginBottom: Spacing.md,
-                }}
-              />
+              {/* Grab handle — sits in a taller invisible band so the whole top edge feels draggable */}
+              <View style={{ alignItems: 'center', paddingBottom: showHeader ? Spacing.md : Spacing.lg }}>
+                <View
+                  style={{
+                    width: HANDLE_WIDTH,
+                    height: HANDLE_HEIGHT,
+                    borderRadius: Radius.pill,
+                    backgroundColor: accent ? hexToRgba(accentColor, 0.5) : t.borderStrong,
+                  }}
+                />
+              </View>
 
               {showHeader ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.lg }}>
-                  {icon ? (
-                    <View
-                      style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: Radius.md,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: hexToRgba(accentColor, 0.14),
-                      }}
-                    >
-                      <Ionicons name={icon} size={22} color={accentColor} />
-                    </View>
-                  ) : null}
-                  <View style={{ flex: 1, gap: 2 }}>
-                    {title ? <Text variant="subtitle">{title}</Text> : null}
-                    {subtitle ? (
-                      <Text variant="caption" color={t.textSecondary}>
-                        {subtitle}
-                      </Text>
+                <View style={{ marginBottom: Spacing.lg }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                    {icon ? (
+                      <View
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: Radius.md,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: hexToRgba(accentColor, 0.14),
+                          borderWidth: StyleSheet.hairlineWidth,
+                          borderColor: hexToRgba(accentColor, 0.22),
+                        }}
+                      >
+                        <Ionicons name={icon} size={22} color={accentColor} />
+                      </View>
                     ) : null}
+                    <View style={{ flex: 1, gap: 2 }}>
+                      {title ? <Text variant="subtitle">{title}</Text> : null}
+                      {subtitle ? (
+                        <Text variant="caption" color={t.textSecondary}>
+                          {subtitle}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
+                  {/* Full-bleed hairline separating the header from the body */}
+                  <View
+                    style={{
+                      height: StyleSheet.hairlineWidth,
+                      backgroundColor: t.border,
+                      marginTop: Spacing.lg,
+                      marginHorizontal: -Spacing.lg,
+                    }}
+                  />
                 </View>
               ) : null}
 

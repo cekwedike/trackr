@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { OrderForm } from '@/components/forms/order-form';
-import { AppHeader, Button, Card, Chip, Divider, IconButton, Screen, SectionHeader, Segmented, Text } from '@/components/ui';
+import { AppHeader, Button, Card, DetailHero, Divider, IconButton, InfoRow, Screen, SectionHeader, Segmented, Text } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { getOrder, getOrderItems, ORDER_STATUSES, setOrderStatus } from '@/db/repos/orders';
@@ -75,9 +75,28 @@ export default function OrderDetail() {
     printReceipt(buildData());
   };
 
+  const statusLabel = ORDER_STATUSES.find((s) => s.value === order.status)?.label;
+  const paymentRows = [
+    <InfoRow key="total" label="Total" value={money(order.total)} />,
+    <InfoRow key="paid" label="Paid" value={money(order.amount_paid)} valueColor={order.amount_paid > 0 ? t.success : undefined} />,
+    order.due_at ? <InfoRow key="due" label="Due" value={formatDate(order.due_at)} /> : null,
+    order.note ? <InfoRow key="note" label="Note" value={order.note} align="flex-start" /> : null,
+  ].filter(Boolean);
+
   return (
     <Screen>
       <AppHeader title={order.customer_name || `${terms.order} #${order.id}`} back right={<IconButton icon="create-outline" tone="primary" onPress={() => setEditing(true)} />} />
+
+      <DetailHero
+        label={balance > 0 ? 'Balance due' : 'Fully paid'}
+        value={money(balance > 0 ? balance : order.total)}
+        valueColor={balance > 0 ? t.warning : t.success}
+        icon="clipboard"
+        tone={balance > 0 ? 'warning' : 'success'}
+        badge={statusLabel}
+        badgeTone={balance > 0 ? 'warning' : 'success'}
+        meta={`${items.length} item${items.length === 1 ? '' : 's'} · ${money(order.total)} total`}
+      />
 
       <SectionHeader title="Status" />
       <View style={{ marginBottom: Spacing.lg }}>
@@ -89,27 +108,26 @@ export default function OrderDetail() {
         />
       </View>
 
-      <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg }}>
-        <Row label="Total" value={money(order.total)} />
-        <Row label="Paid" value={money(order.amount_paid)} />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text variant="body" color={t.textSecondary}>Balance</Text>
-          <Chip label={money(balance)} tone={balance > 0 ? 'warning' : 'success'} />
-        </View>
-        {order.due_at ? <Row label="Due" value={formatDate(order.due_at)} /> : null}
-        {order.note ? <Row label="Note" value={order.note} /> : null}
+      <SectionHeader title="Payment" />
+      <Card style={{ marginBottom: Spacing.lg }}>
+        {paymentRows.map((row, idx) => (
+          <View key={idx}>
+            {row}
+            {idx < paymentRows.length - 1 ? <Divider /> : null}
+          </View>
+        ))}
       </Card>
 
-      <SectionHeader title="Items" />
+      <SectionHeader title="Items" subtitle={`${items.length} line item${items.length === 1 ? '' : 's'}`} />
       <Card>
         {items.map((it, idx) => (
           <View key={it.id}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.md, gap: Spacing.md }}>
               <View style={{ flex: 1 }}>
-                <Text variant="body" weight="medium">{it.name}</Text>
+                <Text variant="body" weight="semibold">{it.name}</Text>
                 <Text variant="caption" color={t.textSecondary}>{it.qty} × {money(it.unit_price)}</Text>
               </View>
-              <Text variant="body" weight="semibold">{money(it.line_total)}</Text>
+              <Text variant="body" weight="bold">{money(it.line_total)}</Text>
             </View>
             {idx < items.length - 1 ? <Divider /> : null}
           </View>
@@ -121,15 +139,5 @@ export default function OrderDetail() {
         <Button title="Print" variant="secondary" icon="print-outline" onPress={onPrint} style={{ flex: 1 }} />
       </View>
     </Screen>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  const t = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-      <Text variant="body" color={t.textSecondary}>{label}</Text>
-      <Text variant="body" weight="medium" style={{ flexShrink: 1, textAlign: 'right', marginLeft: Spacing.md }}>{value}</Text>
-    </View>
   );
 }

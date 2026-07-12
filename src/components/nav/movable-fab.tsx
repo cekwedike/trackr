@@ -160,6 +160,13 @@ export function MovableFab({
     setExpanded(true);
   };
   const close = () => setExpanded(false);
+  // Tapping the FAB toggles: when the speed-dial is open the icon has rotated to an
+  // "×", so a tap must dismiss rather than re-open. The Tap gesture is recreated on
+  // every render, so this closure always sees the current `expanded` value.
+  const toggle = () => {
+    if (expanded) close();
+    else open();
+  };
   const openEditor = () => {
     setExpanded(false);
     setEditOpen(true);
@@ -199,7 +206,7 @@ export function MovableFab({
   const tap = Gesture.Tap()
     .maxDuration(250)
     .onStart(() => {
-      runOnJS(open)();
+      runOnJS(toggle)();
     });
 
   const longPress = Gesture.LongPress()

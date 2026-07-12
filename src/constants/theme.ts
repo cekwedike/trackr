@@ -109,6 +109,7 @@ export const Spacing = {
 } as const;
 
 export const Radius = {
+  xs: 6,
   sm: 8,
   md: 12,
   lg: 16,
@@ -124,6 +125,20 @@ export const FontSize = {
   xl: 20,
   xxl: 26,
   xxxl: 34,
+} as const;
+
+/**
+ * Line heights paired with the type scale. Generous leading keeps body copy
+ * readable and gives headings a confident, deliberate rhythm.
+ */
+export const LineHeight = {
+  xs: 15,
+  sm: 18,
+  md: 22,
+  lg: 24,
+  xl: 26,
+  xxl: 32,
+  xxxl: 40,
 } as const;
 
 export const FontWeight = {

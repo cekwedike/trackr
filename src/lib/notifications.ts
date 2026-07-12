@@ -99,6 +99,17 @@ export async function scheduleReminder(
         };
         break;
       case 'monthly':
+        // MONTHLY fires once per month when day/hour/minute match, and handles
+        // the next occurrence itself — so it stays valid even when today's time
+        // has already passed (unlike the one-time DATE path below).
+        trigger = {
+          type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+          day: due.getDate(),
+          hour,
+          minute,
+          channelId,
+        };
+        break;
       case 'none':
       default: {
         if (due.getTime() <= Date.now()) return null;

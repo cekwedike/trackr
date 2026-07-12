@@ -1,13 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+
+import { Duration, Ease } from '@/constants/motion';
 
 import { Aurora, FadeSlide } from '@/components/anim';
 import { AnimatedGrid } from '@/components/nav';
 import { Brand, Button, Card, Screen, Text, TextField, Toggle } from '@/components/ui';
 import { CURRENCIES } from '@/constants/currencies';
 import { getIndustry, INDUSTRIES } from '@/constants/industries';
-import { Radius, Spacing } from '@/constants/theme';
+import { FontWeight, Radius, Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { updateSettings } from '@/db/repos/settings';
 import { useTheme } from '@/hooks/use-theme';
@@ -81,12 +89,14 @@ export default function Onboarding() {
 
   return (
     <Screen scroll>
-      <View style={{ overflow: 'hidden', borderRadius: Radius.xl, marginTop: Spacing.xl, marginBottom: Spacing.xl }}>
+      <View style={{ overflow: 'hidden', borderRadius: Radius.xl, marginTop: Spacing.xl, marginBottom: Spacing.lg }}>
         <Aurora colors={[t.primary, t.accent, t.info]} opacity={0.4} />
         <View style={{ alignItems: 'center', paddingVertical: Spacing.xl }}>
           <Brand size={76} showWordmark subtitle="Your business, in your pocket" />
         </View>
       </View>
+
+      <StepProgress step={step} total={5} />
 
       {step === 0 ? (
         <FadeSlide key="s0">
@@ -315,5 +325,36 @@ export default function Onboarding() {
         </FadeSlide>
       ) : null}
     </Screen>
+  );
+}
+
+const STEP_LABELS = ['Your business', 'What you do', 'Currency', 'Reminders', 'Security'];
+
+/** Slim animated progress bar + step counter that gives onboarding a guided, premium feel. */
+function StepProgress({ step, total }: { step: number; total: number }) {
+  const t = useTheme();
+  const { accent } = useApp();
+  const reduced = useReducedMotion();
+  const progress = useSharedValue((step + 1) / total);
+
+  useEffect(() => {
+    const target = (step + 1) / total;
+    progress.value = withTiming(target, { duration: reduced ? Duration.instant : Duration.base, easing: Ease.standard });
+  }, [step, total, reduced, progress]);
+
+  const fill = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` }));
+
+  return (
+    <View style={{ marginBottom: Spacing.xl, gap: Spacing.sm }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text variant="label">{STEP_LABELS[step] ?? ''}</Text>
+        <Text variant="caption" color={t.textMuted} style={{ fontWeight: FontWeight.semibold }}>
+          Step {step + 1} of {total}
+        </Text>
+      </View>
+      <View style={{ height: 6, borderRadius: 3, backgroundColor: t.cardAlt, overflow: 'hidden' }}>
+        <Animated.View style={[{ height: 6, borderRadius: 3, backgroundColor: accent }, fill]} />
+      </View>
+    </View>
   );
 }

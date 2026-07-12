@@ -1,16 +1,17 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
 
-import { Button, IconButton, Text, TextField, type IconName } from '@/components/ui';
+import { Button, IconButton, Text, type IconName } from '@/components/ui';
 import { INDUSTRIES } from '@/constants/industries';
 import { FontSize, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
 import { hexToRgba } from '@/lib/color';
 import { formatDateTime, formatDate } from '@/lib/date';
+import { selectionFeedback } from '@/lib/haptics';
 
 export interface SelectOption {
   id: string;
@@ -51,6 +52,7 @@ export function SelectModal({
   const t = useTheme();
   const { accent, industry } = useApp();
   const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
   const filtered = useMemo(() => {
     if (!query.trim()) return options;
     const q = query.toLowerCase();
@@ -62,6 +64,12 @@ export function SelectModal({
     const ind = industryById(o.id);
     return ind ? ind.id === industry.id : false;
   };
+
+  // Only mount the native <Modal> while open. Multiple concurrently-mounted
+  // RN <Modal>s (a screen can declare several SelectModals) conflict on Android
+  // and the first-declared one may fail to present; unmounting hidden pickers
+  // guarantees at most one native modal exists at a time.
+  if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>

@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
-import { Button, Card, AppHeader, Screen, Text, TextField, Toggle } from '@/components/ui';
+import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { DateTimeField } from '@/components/pickers';
 import { Ionicons } from '@expo/vector-icons';
 import { Spacing } from '@/constants/theme';
@@ -12,7 +12,7 @@ import type { Customer } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
 import { fromMinor, parseMoney } from '@/lib/money';
 
-export function CustomerForm({ initial }: { initial?: Customer }) {
+export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?: () => void }) {
   const t = useTheme();
   const { currencySymbol, terms } = useApp();
   const [name, setName] = useState(initial?.name ?? '');
@@ -43,7 +43,8 @@ export function CustomerForm({ initial }: { initial?: Customer }) {
       };
       if (initial) await updateCustomer(initial.id, payload);
       else await createCustomer(payload);
-      router.back();
+      if (onDone) onDone();
+      else router.back();
     } finally {
       setSaving(false);
     }
@@ -60,6 +61,8 @@ export function CustomerForm({ initial }: { initial?: Customer }) {
   return (
     <Screen>
       <AppHeader title={initial ? `Edit ${terms.customer.toLowerCase()}` : `New ${terms.customer.toLowerCase()}`} back />
+
+      <SectionHeader title="Contact" />
       <Card style={{ gap: Spacing.md }}>
         <TextField label="Name" value={name} onChangeText={setName} placeholder="Full name" autoFocus={!initial} />
         <TextField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="080..." />
@@ -74,7 +77,10 @@ export function CustomerForm({ initial }: { initial?: Customer }) {
           <Toggle value={hasBirthday} onValueChange={setHasBirthday} />
         </View>
         {hasBirthday ? <DateTimeField value={birthday} onChange={setBirthday} mode="date" /> : null}
+      </Card>
 
+      <SectionHeader title="Financial" style={{ marginTop: Spacing.lg }} />
+      <Card style={{ gap: Spacing.md }}>
         <TextField label="Outstanding debt (owed to you)" value={debt} onChangeText={setDebt} keyboardType="numeric" prefix={currencySymbol} />
         <TextField label="Note" value={note} onChangeText={setNote} placeholder="Preferences, etc." multiline />
       </Card>

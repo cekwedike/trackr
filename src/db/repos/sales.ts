@@ -92,7 +92,39 @@ export async function createSale(input: SaleInput): Promise<number> {
 
 export async function deleteSale(id: number): Promise<void> {
   const db = await getDb();
-  await db.runAsync('DELETE FROM sales WHERE id = ?', [id]);
+  const sale = await getSale(id);
+  if (!sale) return;
+  const items = await getSaleItems(id);
+  const now = nowIso();
+
+  await db.withTransactionAsync(async () => {
+    // Reverse the stock decrement `createSale` applied for each product line.
+    for (const it of items) {
+      if (it.product_id) {
+        await db.runAsync('UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?', [
+          it.qty,
+          now,
+          it.product_id,
+        ]);
+        await db.runAsync(
+          'INSERT INTO stock_movements (item_type, item_id, change, reason, created_at) VALUES (?, ?, ?, ?, ?)',
+          ['product', it.product_id, it.qty, 'Sale deleted', now],
+        );
+      }
+    }
+
+    // Reverse the debt `createSale` added for credit sales (basis: sale total).
+    if (sale.customer_id && sale.payment_method === 'credit') {
+      await db.runAsync('UPDATE customers SET debt_balance = debt_balance - ?, updated_at = ? WHERE id = ?', [
+        sale.total,
+        now,
+        sale.customer_id,
+      ]);
+    }
+
+    // sale_items rows are removed via ON DELETE CASCADE.
+    await db.runAsync('DELETE FROM sales WHERE id = ?', [id]);
+  });
 }
 
 /** Lightweight row for global search results. */
