@@ -1,5 +1,6 @@
 import { getDb } from '@/db/client';
 import type { Customer } from '@/db/types';
+import { logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface CustomerInput {
@@ -40,6 +41,7 @@ export async function createCustomer(input: CustomerInput): Promise<number> {
       now,
     ],
   );
+  await logAudit('customer', res.lastInsertRowId, 'create', `Added customer "${input.name}"`);
   return res.lastInsertRowId;
 }
 
@@ -59,6 +61,7 @@ export async function updateCustomer(id: number, input: CustomerInput): Promise<
       id,
     ],
   );
+  await logAudit('customer', id, 'update', `Updated customer "${input.name}"`);
 }
 
 export async function adjustDebt(id: number, delta: number): Promise<void> {
@@ -73,6 +76,7 @@ export async function adjustDebt(id: number, delta: number): Promise<void> {
 export async function deleteCustomer(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM customers WHERE id = ?', [id]);
+  await logAudit('customer', id, 'delete', 'Deleted customer');
 }
 
 /** Lightweight row for global search results. */

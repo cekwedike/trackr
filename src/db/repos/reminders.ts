@@ -1,5 +1,6 @@
 import { getDb } from '@/db/client';
 import type { Recurrence, Reminder } from '@/db/types';
+import { logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface ReminderInput {
@@ -41,17 +42,20 @@ export async function createReminder(input: ReminderInput): Promise<number> {
       now,
     ],
   );
+  await logAudit('reminder', res.lastInsertRowId, 'create', `Created reminder "${input.title}"`);
   return res.lastInsertRowId;
 }
 
 export async function setReminderCompleted(id: number, completed: boolean): Promise<void> {
   const db = await getDb();
   await db.runAsync('UPDATE reminders SET completed = ?, updated_at = ? WHERE id = ?', [completed ? 1 : 0, nowIso(), id]);
+  await logAudit('reminder', id, 'update', completed ? 'Completed reminder' : 'Reopened reminder');
 }
 
 export async function deleteReminder(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM reminders WHERE id = ?', [id]);
+  await logAudit('reminder', id, 'delete', 'Deleted reminder');
 }
 
 /** Total number of reminders ever created (including completed). */

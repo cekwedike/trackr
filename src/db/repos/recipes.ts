@@ -1,5 +1,6 @@
 import { getDb } from '@/db/client';
 import type { Recipe, RecipeItem } from '@/db/types';
+import { logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface RecipeItemInput {
@@ -49,6 +50,7 @@ export async function createRecipe(input: RecipeInput): Promise<number> {
       );
     }
   });
+  await logAudit('recipe', recipeId, 'create', `Created recipe "${input.name}"`);
   return recipeId;
 }
 
@@ -68,11 +70,13 @@ export async function updateRecipe(id: number, input: RecipeInput): Promise<void
       );
     }
   });
+  await logAudit('recipe', id, 'update', `Updated recipe "${input.name}"`);
 }
 
 export async function deleteRecipe(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM recipes WHERE id = ?', [id]);
+  await logAudit('recipe', id, 'delete', 'Deleted recipe');
 }
 
 /** Total number of recipes. */

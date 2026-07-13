@@ -1,5 +1,6 @@
 import { getDb } from '@/db/client';
 import type { Product } from '@/db/types';
+import { logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface ProductInput {
@@ -47,6 +48,7 @@ export async function createProduct(input: ProductInput): Promise<number> {
       now,
     ],
   );
+  await logAudit('product', res.lastInsertRowId, 'create', `Added product "${input.name}"`);
   return res.lastInsertRowId;
 }
 
@@ -69,11 +71,13 @@ export async function updateProduct(id: number, input: ProductInput): Promise<vo
       id,
     ],
   );
+  await logAudit('product', id, 'update', `Updated product "${input.name}"`);
 }
 
 export async function deleteProduct(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM products WHERE id = ?', [id]);
+  await logAudit('product', id, 'delete', 'Deleted product');
 }
 
 /** Adjust stock by a delta and log a movement. */
@@ -84,6 +88,22 @@ export async function adjustProductStock(id: number, delta: number, reason: stri
     'INSERT INTO stock_movements (item_type, item_id, change, reason, created_at) VALUES (?, ?, ?, ?, ?)',
     ['product', id, delta, reason, nowIso()],
   );
+}
+
+/**
+ * Suggested quantity to reorder for a low/out-of-stock product: enough to bring
+ * stock comfortably back above its threshold (a two-threshold safety buffer),
+ * never less than 1. Pure — safe to call from UI + aggregation code.
+ */
+export function suggestedReorder(product: Pick<Product, 'stock' | 'low_stock_threshold'>): number {
+  const target = Math.max(product.low_stock_threshold * 2, product.low_stock_threshold + 1);
+  return Math.max(Math.ceil(target - product.stock), 1);
+}
+
+/** Increase a product's stock by `qty` (a restock) and log the movement. Thin wrapper over {@link adjustProductStock}. */
+export async function restockProduct(id: number, qty: number): Promise<void> {
+  if (!(qty > 0)) return;
+  await adjustProductStock(id, qty, 'Restock');
 }
 
 /** Lightweight row for global search results. */

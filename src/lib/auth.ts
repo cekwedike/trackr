@@ -42,10 +42,12 @@ export async function isBiometricAvailable(): Promise<boolean> {
   return hasHardware && enrolled;
 }
 
-export async function authenticateBiometric(): Promise<boolean> {
+export async function authenticateBiometric(reason = 'Unlock Trackr'): Promise<boolean> {
   const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: 'Unlock Trackr',
+    promptMessage: reason,
+    // iOS-only label shown after failed biometric attempts.
     fallbackLabel: 'Use PIN',
+    // Keep the device passcode as a backstop so users are never locked out.
     disableDeviceFallback: false,
   });
   return result.success;

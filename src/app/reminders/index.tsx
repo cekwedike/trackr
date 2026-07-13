@@ -3,9 +3,10 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
+import { useUndo } from '@/components/undo';
 import { AppHeader, Card, Chip, EmptyState, FAB, IconButton, Screen, Text } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
-import { deleteReminder, getReminder, listReminders, setReminderCompleted } from '@/db/repos/reminders';
+import { createReminder, deleteReminder, getReminder, listReminders, setReminderCompleted } from '@/db/repos/reminders';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateTime, fromNow } from '@/lib/date';
@@ -16,6 +17,7 @@ const RECUR_LABEL: Record<string, string> = { none: 'Once', daily: 'Daily', week
 export default function RemindersScreen() {
   const t = useTheme();
   const confirm = useConfirm();
+  const { showUndo } = useUndo();
   const { data, reload } = useAsyncData(() => listReminders(true), []);
 
   const complete = async (id: number, done: boolean) => {
@@ -37,10 +39,31 @@ export default function RemindersScreen() {
       ],
     });
     if (choice !== 'delete') return;
-    const r = await getReminder(id);
-    await cancelReminder(r?.notification_id);
+    // Snapshot the reminder before deleting so UNDO can re-create it (new id).
+    // Best-effort: the scheduled OS notification is cancelled on delete and is
+    // not re-scheduled on restore (notification_id cleared), matching how the
+    // list re-creates records without touching notifications.
+    const snap = await getReminder(id);
+    await cancelReminder(snap?.notification_id);
     await deleteReminder(id);
     reload();
+    if (snap) {
+      showUndo({
+        message: 'Deleted reminder',
+        onUndo: async () => {
+          await createReminder({
+            title: snap.title,
+            body: snap.body,
+            due_at: snap.due_at,
+            recurrence: snap.recurrence,
+            notification_id: null,
+            target_type: snap.target_type,
+            target_id: snap.target_id,
+          });
+          reload();
+        },
+      });
+    }
   };
 
   const active = (data ?? []).filter((r) => r.completed === 0);

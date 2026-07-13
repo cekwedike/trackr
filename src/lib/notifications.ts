@@ -1,5 +1,6 @@
 import type { Recurrence } from '@/db/types';
 import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 /** Brand blue — matches the `expo-notifications` plugin `color` in app.json. */
@@ -141,5 +142,124 @@ export async function cancelReminder(notificationId: string | null | undefined):
     await Notifications.cancelScheduledNotificationAsync(notificationId);
   } catch {
     // ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Recurring summary nudges (daily / weekly)
+//
+// These are standing, repeating local notifications the user opts into from
+// Settings — separate from user-created reminders. We keep the scheduled id in
+// secure-store so a nudge can be cancelled or rescheduled (e.g. when the user
+// changes the time) without touching the database. Both use the existing
+// "Reminders" channel and the DAILY / WEEKLY schedulable triggers.
+// ---------------------------------------------------------------------------
+
+const DAILY_NUDGE_ID_KEY = 'nudge.daily.notificationId';
+const WEEKLY_NUDGE_ID_KEY = 'nudge.weekly.notificationId';
+
+async function readNudgeId(key: string): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch {
+    return null;
+  }
+}
+
+async function writeNudgeId(key: string, id: string | null): Promise<void> {
+  try {
+    if (id) await SecureStore.setItemAsync(key, id);
+    else await SecureStore.deleteItemAsync(key);
+  } catch {
+    // secure-store is best-effort; a failure just means we can't persist the id
+  }
+}
+
+/** Cancel the daily summary nudge (if scheduled) and forget its id. */
+export async function cancelDailyNudge(): Promise<void> {
+  const id = await readNudgeId(DAILY_NUDGE_ID_KEY);
+  await cancelReminder(id);
+  await writeNudgeId(DAILY_NUDGE_ID_KEY, null);
+}
+
+/**
+ * Schedule (or reschedule) a repeating daily summary nudge at the given local
+ * time. Cancels any previously scheduled daily nudge first so times never stack.
+ * Returns the scheduled id, or null if permission was denied / scheduling failed.
+ */
+export async function scheduleDailyNudge(hour: number, minute: number): Promise<string | null> {
+  try {
+    ensureNotificationHandler();
+    const granted = await requestNotificationPermission();
+    if (!granted) return null;
+
+    await cancelDailyNudge();
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Daily summary',
+        body: "Take a moment to log today's sales and expenses in Trackr.",
+        color: BRAND_COLOR,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        sound: 'default',
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour,
+        minute,
+        channelId: REMINDERS_CHANNEL_ID,
+      },
+    });
+    await writeNudgeId(DAILY_NUDGE_ID_KEY, id);
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/** Cancel the weekly summary nudge (if scheduled) and forget its id. */
+export async function cancelWeeklyNudge(): Promise<void> {
+  const id = await readNudgeId(WEEKLY_NUDGE_ID_KEY);
+  await cancelReminder(id);
+  await writeNudgeId(WEEKLY_NUDGE_ID_KEY, null);
+}
+
+/**
+ * Schedule (or reschedule) a repeating weekly summary nudge. `weekday` follows
+ * the expo-notifications convention (1 = Sunday … 7 = Saturday). Cancels any
+ * previously scheduled weekly nudge first. Returns the scheduled id, or null.
+ */
+export async function scheduleWeeklyNudge(
+  weekday: number,
+  hour: number,
+  minute: number,
+): Promise<string | null> {
+  try {
+    ensureNotificationHandler();
+    const granted = await requestNotificationPermission();
+    if (!granted) return null;
+
+    await cancelWeeklyNudge();
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Weekly review',
+        body: 'Check your profit, top sellers and expenses for the week in Trackr.',
+        color: BRAND_COLOR,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        sound: 'default',
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday,
+        hour,
+        minute,
+        channelId: REMINDERS_CHANNEL_ID,
+      },
+    });
+    await writeNudgeId(WEEKLY_NUDGE_ID_KEY, id);
+    return id;
+  } catch {
+    return null;
   }
 }

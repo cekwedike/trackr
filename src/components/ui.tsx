@@ -19,6 +19,8 @@ import {
   type KeyboardTypeOptions,
 } from 'react-native';
 import Animated, {
+  useAnimatedRef,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -30,6 +32,7 @@ import { KeyboardAwareScrollView, KeyboardAvoidingView } from 'react-native-keyb
 
 import { PressableScale } from '@/components/anim/pressable';
 import { FadeSlide } from '@/components/anim/stagger';
+import { ScrollPositionProvider, type ScrollPosition } from '@/components/scroll-context';
 import { Duration, Ease, PressScale, Spring } from '@/constants/motion';
 import { FontSize, FontWeight, LineHeight, MaxContentWidth, Radius, Shadow, Spacing, type ThemeColors } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
@@ -38,6 +41,11 @@ import { hexToRgba, shade } from '@/lib/color';
 import { selectionFeedback } from '@/lib/haptics';
 
 const APP_ICON = require('../../assets/images/icon.png');
+
+// Reanimated-driven wrapper so Screen can publish a UI-thread scroll offset to
+// <Collapsible auto> without breaking keyboard-controller's focus handling
+// (this is the same createAnimatedComponent pattern the library documents).
+const AnimatedKeyboardScrollView = Animated.createAnimatedComponent(KeyboardAwareScrollView);
 
 /** Logo mark (optionally with wordmark) used on onboarding, lock and loading screens. */
 export function Brand({
@@ -195,6 +203,27 @@ export function Screen({
   const { width } = useWindowDimensions();
   const hPad = padded ? (width >= 480 ? Spacing.xl : Spacing.lg) : 0;
   const centered: ViewStyle = { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' };
+
+  // Scroll broadcast for viewport-aware <Collapsible auto>. These shared values
+  // are updated entirely on the UI thread, so they add no render cost when unused.
+  // We measure against `containerRef` (the viewport frame) rather than the scroll
+  // view itself, which keeps typing clean and works in both branches.
+  const scrollY = useSharedValue(0);
+  const viewportHeight = useSharedValue(0);
+  const containerRef = useAnimatedRef<Animated.View>();
+  const scrollHandler = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+  const scrollPos = React.useMemo<ScrollPosition>(
+    () => ({ scrollY, viewportHeight, scrollRef: containerRef, enabled: scroll }),
+    // shared values + animated ref are stable; only `scroll` toggles capability
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [scroll],
+  );
+  const onContainerLayout = (e: LayoutChangeEvent) => {
+    viewportHeight.value = e.nativeEvent.layout.height;
+  };
+
   // Keyboard handling is centralized here so every form/input screen keeps the
   // focused field visible above the keyboard (WhatsApp-style). We use
   // react-native-keyboard-controller's KeyboardAwareScrollView, which auto-scrolls
@@ -203,21 +232,27 @@ export function Screen({
   // Requires <KeyboardProvider> mounted at the app root (see app/_layout.tsx).
   return (
     <SafeAreaView edges={['top']} style={[{ flex: 1, backgroundColor: t.background }, style]}>
-      {scroll ? (
-        <KeyboardAwareScrollView
-          bottomOffset={24}
-          contentContainerStyle={[{ paddingBottom: Spacing.xxxl * 2, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, contentStyle]}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={centered}>{children}</View>
-        </KeyboardAwareScrollView>
-      ) : (
-        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-          <View style={[{ flex: 1, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, centered]}>{children}</View>
-        </KeyboardAvoidingView>
-      )}
+      <ScrollPositionProvider value={scrollPos}>
+        <Animated.View ref={containerRef} onLayout={onContainerLayout} style={{ flex: 1 }}>
+          {scroll ? (
+            <AnimatedKeyboardScrollView
+              onScroll={scrollHandler}
+              scrollEventThrottle={16}
+              bottomOffset={24}
+              contentContainerStyle={[{ paddingBottom: Spacing.xxxl * 2, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, contentStyle]}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={centered}>{children}</View>
+            </AnimatedKeyboardScrollView>
+          ) : (
+            <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+              <View style={[{ flex: 1, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, centered]}>{children}</View>
+            </KeyboardAvoidingView>
+          )}
+        </Animated.View>
+      </ScrollPositionProvider>
     </SafeAreaView>
   );
 }
@@ -931,6 +966,11 @@ export function SectionHeader({
     </View>
   );
 }
+
+// ---------- Collapsible ----------
+// Re-exported from the shared kit for convenience; implementation lives in
+// collapsible.tsx to keep this module focused and avoid load-order coupling.
+export { Collapsible, type CollapsibleProps } from '@/components/collapsible';
 
 // ---------- Divider ----------
 export function Divider() {

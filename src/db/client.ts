@@ -216,6 +216,56 @@ const MIGRATIONS: string[] = [
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_profit_records_month ON profit_records(month);
   `,
+  // v5: phase-2 features — payment history, recurring rules, audit log, attachments
+  `
+  CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,               -- 'order' | 'debt'
+    ref_id INTEGER NOT NULL,          -- order id (kind='order') or customer id (kind='debt')
+    amount INTEGER NOT NULL DEFAULT 0,
+    method TEXT NOT NULL DEFAULT 'cash',
+    note TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS recurring_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL DEFAULT 'expense', -- 'expense'
+    amount INTEGER NOT NULL DEFAULT 0,
+    category TEXT,
+    description TEXT,
+    payment_method TEXT,
+    cadence TEXT NOT NULL DEFAULT 'monthly', -- 'daily' | 'weekly' | 'monthly'
+    next_run TEXT NOT NULL,
+    last_run TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity TEXT NOT NULL,
+    entity_id INTEGER,
+    action TEXT NOT NULL,             -- 'create' | 'update' | 'delete'
+    summary TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity TEXT NOT NULL,             -- 'sale' | 'expense'
+    entity_id INTEGER NOT NULL,
+    uri TEXT NOT NULL,
+    mime TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_payments_ref ON payments(kind, ref_id);
+  CREATE INDEX IF NOT EXISTS idx_recurring_next ON recurring_rules(next_run);
+  CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
+  CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity, entity_id);
+  `,
 ];
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {

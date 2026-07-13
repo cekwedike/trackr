@@ -1,5 +1,6 @@
 import { getDb } from '@/db/client';
 import type { LinkTargetType, Link, Note } from '@/db/types';
+import { logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface NoteInput {
@@ -90,6 +91,7 @@ export async function createNote(input: NoteInput): Promise<number> {
   const id = res.lastInsertRowId;
   await rebuildWikiLinks(id, input.body ?? '');
   await resolveDanglingLinksTo(input.title);
+  await logAudit('note', id, 'create', `Created note "${input.title || 'Untitled'}"`);
   return id;
 }
 
@@ -105,6 +107,7 @@ export async function updateNote(id: number, input: NoteInput): Promise<void> {
   ]);
   await rebuildWikiLinks(id, input.body ?? '');
   await resolveDanglingLinksTo(input.title);
+  await logAudit('note', id, 'update', `Updated note "${input.title || 'Untitled'}"`);
 }
 
 /** When a note is created/renamed, resolve any unresolved wiki links that referenced its title. */
@@ -123,6 +126,7 @@ export async function deleteNote(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM notes WHERE id = ?', [id]);
   await db.runAsync("UPDATE links SET target_id = NULL WHERE target_type = 'note' AND target_id = ?", [id]);
+  await logAudit('note', id, 'delete', 'Deleted note');
 }
 
 export async function togglePinned(id: number, pinned: boolean): Promise<void> {

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
+import { useUndo } from '@/components/undo';
 import { Button, Card, IconButton, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { SelectField, SelectModal } from '@/components/pickers';
@@ -28,6 +29,7 @@ const nextKey = () => `r-${counter++}`;
 export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () => void }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const { showUndo } = useUndo();
   const { money } = useApp();
 
   const [name, setName] = useState(initial?.name ?? '');
@@ -104,8 +106,28 @@ export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () 
       ],
     });
     if (choice === 'delete') {
-      await deleteRecipe(initial.id);
+      // Snapshot the recipe + its ingredient rows before deleting so UNDO can
+      // re-create it faithfully (new id).
+      const snap = initial;
+      const snapItems = await getRecipeItems(snap.id);
+      await deleteRecipe(snap.id);
       router.back();
+      showUndo({
+        message: 'Deleted recipe',
+        onUndo: () =>
+          createRecipe({
+            product_id: snap.product_id,
+            name: snap.name,
+            yield_qty: snap.yield_qty,
+            notes: snap.notes,
+            items: snapItems.map((it) => ({
+              ingredient_id: it.ingredient_id,
+              name: it.name,
+              qty: it.qty,
+              unit: it.unit,
+            })),
+          }),
+      });
     }
   };
 

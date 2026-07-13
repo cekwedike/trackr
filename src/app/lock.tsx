@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 
@@ -9,7 +9,7 @@ import { Spring } from '@/constants/motion';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
-import { authenticateBiometric, verifyPin } from '@/lib/auth';
+import { authenticateBiometric, isBiometricAvailable, verifyPin } from '@/lib/auth';
 import { successFeedback, tapFeedback, warningFeedback } from '@/lib/haptics';
 
 export default function Lock() {
@@ -17,23 +17,45 @@ export default function Lock() {
   const { settings, unlock } = useApp();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [biometricReady, setBiometricReady] = useState(false);
+  const autoPrompted = useRef(false);
   const shake = useSharedValue(0);
 
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.value }] }));
 
-  const tryBiometric = useCallback(async () => {
-    if (settings?.biometric_enabled === 1) {
-      const ok = await authenticateBiometric();
-      if (ok) {
-        successFeedback();
-        unlock();
-      }
-    }
-  }, [settings, unlock]);
+  // Only offer biometrics when the user opted in AND the device can actually
+  // do it (hardware present + a fingerprint/face enrolled).
+  const biometricEnabled = settings?.biometric_enabled === 1;
 
   useEffect(() => {
-    tryBiometric();
-  }, [tryBiometric]);
+    let active = true;
+    // Resolve readiness asynchronously so we never call setState synchronously
+    // in the effect body. Readiness = opted in AND device supports/enrolled.
+    Promise.resolve(biometricEnabled ? isBiometricAvailable() : false).then((ok) => {
+      if (active) setBiometricReady(ok);
+    });
+    return () => {
+      active = false;
+    };
+  }, [biometricEnabled]);
+
+  const tryBiometric = useCallback(async () => {
+    if (!biometricEnabled || !biometricReady) return;
+    const ok = await authenticateBiometric(`Unlock ${settings?.business_name ?? 'Trackr'}`);
+    // On failure or cancel we stay locked and the PIN pad remains available.
+    if (ok) {
+      successFeedback();
+      unlock();
+    }
+  }, [biometricEnabled, biometricReady, settings?.business_name, unlock]);
+
+  useEffect(() => {
+    // Auto-prompt exactly once, as soon as biometrics are confirmed available.
+    if (biometricReady && !autoPrompted.current) {
+      autoPrompted.current = true;
+      tryBiometric();
+    }
+  }, [biometricReady, tryBiometric]);
 
   const attempt = useCallback(
     async (candidate: string) => {
@@ -95,7 +117,7 @@ export default function Lock() {
         {keys.map((k) => (
           <PadButton key={k} label={k} onPress={() => press(k)} />
         ))}
-        {settings?.biometric_enabled === 1 ? (
+        {biometricReady ? (
           <PadButton icon="finger-print" onPress={tryBiometric} />
         ) : (
           <View style={{ width: 76, height: 76 }} />
@@ -103,6 +125,15 @@ export default function Lock() {
         <PadButton label="0" onPress={() => press('0')} />
         <PadButton icon="backspace-outline" onPress={backspace} />
       </View>
+
+      {biometricReady ? (
+        <PressableScale onPress={tryBiometric} hitSlop={8} style={{ alignSelf: 'center', marginTop: Spacing.xl }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <Ionicons name="finger-print" size={18} color={t.primary} />
+            <Text variant="label" color={t.primary}>Use biometrics</Text>
+          </View>
+        </PressableScale>
+      ) : null}
     </View>
   );
 }

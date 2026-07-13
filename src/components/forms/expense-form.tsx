@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
+import { useUndo } from '@/components/undo';
 import { Button, Card, Screen, AppHeader, TextField } from '@/components/ui';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
 import { Spacing } from '@/constants/theme';
@@ -16,6 +17,7 @@ const PAYMENT = ['Cash', 'Transfer', 'POS', 'Card', 'Other'];
 export function ExpenseForm({ initial }: { initial?: Expense }) {
   const { currencySymbol } = useApp();
   const confirm = useConfirm();
+  const { showUndo } = useUndo();
   const [amount, setAmount] = useState(initial ? String(fromMinor(initial.amount)) : '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [category, setCategory] = useState(initial?.category ?? '');
@@ -59,8 +61,22 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
       ],
     });
     if (choice === 'delete') {
-      await deleteExpense(initial.id);
+      // Snapshot the expense before deleting so UNDO can re-create it (new id).
+      // Best-effort: photo attachments are not restored.
+      const snap = initial;
+      await deleteExpense(snap.id);
       router.back();
+      showUndo({
+        message: 'Deleted expense',
+        onUndo: () =>
+          createExpense({
+            occurred_at: snap.occurred_at,
+            amount: snap.amount,
+            description: snap.description,
+            category: snap.category,
+            payment_method: snap.payment_method,
+          }),
+      });
     }
   };
 

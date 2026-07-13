@@ -12,13 +12,12 @@ import Animated, {
 
 import { FadeSlide } from '@/components/anim';
 import { useConfirm } from '@/components/confirm';
-import { Card, IconButton, ListRow, Text } from '@/components/ui';
+import { Collapsible, IconButton, ListRow, Text } from '@/components/ui';
 import { Duration, Ease } from '@/constants/motion';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
-import { hexToRgba } from '@/lib/color';
 import { dismissChecklist, isChecklistDismissed, loadOnboardingProgress } from '@/lib/onboarding';
 
 /**
@@ -63,29 +62,15 @@ export function GettingStarted() {
 
   return (
     <FadeSlide style={{ marginBottom: Spacing.lg }}>
-      <Card style={{ gap: Spacing.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
-          <View
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: Radius.md,
-              backgroundColor: hexToRgba(accent, 0.14),
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name={complete ? 'trophy' : 'rocket'} size={22} color={accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="subtitle">{complete ? 'You’re all set!' : 'Getting started'}</Text>
-            <Text variant="caption" color={t.textSecondary}>
-              {complete ? 'Every step done — you’re a pro.' : `${doneCount} of ${total} done`}
-            </Text>
-          </View>
-          <IconButton icon="close" onPress={hide} size={18} color={t.textMuted} />
-        </View>
-
+      <Collapsible
+        card
+        persistKey="getting-started"
+        icon={complete ? 'trophy' : 'rocket'}
+        title={complete ? 'You’re all set!' : 'Getting started'}
+        subtitle={complete ? 'Every step done — you’re a pro.' : `${doneCount} of ${total} done`}
+        headerRight={<IconButton icon="close" onPress={hide} size={18} color={t.textMuted} />}
+        contentStyle={{ gap: Spacing.md, paddingBottom: Spacing.md }}
+      >
         <ProgressBar pct={pct} color={accent} track={t.cardAlt} />
 
         {complete ? (
@@ -118,7 +103,7 @@ export function GettingStarted() {
             ))}
           </View>
         )}
-      </Card>
+      </Collapsible>
     </FadeSlide>
   );
 }

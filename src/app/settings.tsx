@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, View } from 'react-native';
 
@@ -14,6 +15,31 @@ import { updateSettings } from '@/db/repos/settings';
 import { useTheme } from '@/hooks/use-theme';
 import { clearPin, isBiometricAvailable, setPin } from '@/lib/auth';
 import { exportBackup, importBackup } from '@/lib/backup';
+import { dayjs } from '@/lib/date';
+import { cancelDailyNudge, cancelWeeklyNudge, scheduleDailyNudge, scheduleWeeklyNudge } from '@/lib/notifications';
+
+// Nudge preferences live in secure-store (the settings table has no columns for
+// them), mirroring the onboarding flags. notifications.ts owns the scheduled
+// notification ids; here we only persist the user's on/off choice + daily time.
+const NUDGE_DAILY_ENABLED_KEY = 'nudge.daily.enabled';
+const NUDGE_DAILY_HOUR_KEY = 'nudge.daily.hour';
+const NUDGE_DAILY_MINUTE_KEY = 'nudge.daily.minute';
+const NUDGE_WEEKLY_ENABLED_KEY = 'nudge.weekly.enabled';
+
+// Weekly summary fires Monday morning (expo weekday: 1 = Sunday … 2 = Monday).
+const WEEKLY_NUDGE_WEEKDAY = 2;
+const WEEKLY_NUDGE_HOUR = 9;
+
+/** Time-of-day options for the daily nudge, at 30-minute steps. */
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hour = Math.floor(i / 2);
+  const minute = i % 2 === 0 ? 0 : 30;
+  return { id: `${hour}:${minute}`, hour, minute, label: dayjs().hour(hour).minute(minute).format('h:mm A') };
+});
+
+function timeLabel(hour: number, minute: number): string {
+  return dayjs().hour(hour).minute(minute).format('h:mm A');
+}
 
 export default function Settings() {
   const t = useTheme();
@@ -24,10 +50,45 @@ export default function Settings() {
   const [industryModal, setIndustryModal] = useState(false);
   const [pinModal, setPinModal] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [dailyNudge, setDailyNudge] = useState(false);
+  const [weeklyNudge, setWeeklyNudge] = useState(false);
+  const [dailyHour, setDailyHour] = useState(9);
+  const [dailyMinute, setDailyMinute] = useState(0);
+  const [timeModal, setTimeModal] = useState(false);
 
   useEffect(() => {
     if (settings) setName(settings.business_name);
   }, [settings]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [d, w, h, m] = await Promise.all([
+          SecureStore.getItemAsync(NUDGE_DAILY_ENABLED_KEY),
+          SecureStore.getItemAsync(NUDGE_WEEKLY_ENABLED_KEY),
+          SecureStore.getItemAsync(NUDGE_DAILY_HOUR_KEY),
+          SecureStore.getItemAsync(NUDGE_DAILY_MINUTE_KEY),
+        ]);
+        setDailyNudge(d === '1');
+        setWeeklyNudge(w === '1');
+        if (h != null) setDailyHour(Number(h));
+        if (m != null) setDailyMinute(Number(m));
+      } catch {
+        // secure-store read is best-effort; fall back to defaults
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    isBiometricAvailable().then((ok) => {
+      if (active) setBiometricAvailable(ok);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (!settings) return null;
 
@@ -99,17 +160,54 @@ export default function Settings() {
   };
 
   const toggleBiometric = async () => {
-    if (settings.biometric_enabled === 1) {
-      await updateSettings({ biometric_enabled: 0 });
-    } else {
-      const ok = await isBiometricAvailable();
-      if (!ok) {
-        Alert.alert('Not available', 'No fingerprint or face unlock is set up on this device.');
+    // The row is disabled unless biometrics are available, but re-check to be safe.
+    if (!biometricAvailable) {
+      Alert.alert('Not available', 'No fingerprint or face unlock is set up on this device.');
+      return;
+    }
+    await updateSettings({ biometric_enabled: settings.biometric_enabled === 1 ? 0 : 1 });
+    await reloadSettings();
+  };
+
+  const toggleDailyNudge = async () => {
+    const next = !dailyNudge;
+    if (next) {
+      const id = await scheduleDailyNudge(dailyHour, dailyMinute);
+      if (!id) {
+        Alert.alert('Notifications off', 'Enable notifications for Trackr to get daily nudges.');
         return;
       }
-      await updateSettings({ biometric_enabled: 1 });
+    } else {
+      await cancelDailyNudge();
     }
-    await reloadSettings();
+    setDailyNudge(next);
+    await SecureStore.setItemAsync(NUDGE_DAILY_ENABLED_KEY, next ? '1' : '0').catch(() => {});
+  };
+
+  const changeDailyTime = async (id: string) => {
+    const opt = TIME_OPTIONS.find((o) => o.id === id);
+    if (!opt) return;
+    setDailyHour(opt.hour);
+    setDailyMinute(opt.minute);
+    await SecureStore.setItemAsync(NUDGE_DAILY_HOUR_KEY, String(opt.hour)).catch(() => {});
+    await SecureStore.setItemAsync(NUDGE_DAILY_MINUTE_KEY, String(opt.minute)).catch(() => {});
+    // Reschedule so the change takes effect immediately when the nudge is on.
+    if (dailyNudge) await scheduleDailyNudge(opt.hour, opt.minute);
+  };
+
+  const toggleWeeklyNudge = async () => {
+    const next = !weeklyNudge;
+    if (next) {
+      const id = await scheduleWeeklyNudge(WEEKLY_NUDGE_WEEKDAY, WEEKLY_NUDGE_HOUR, 0);
+      if (!id) {
+        Alert.alert('Notifications off', 'Enable notifications for Trackr to get weekly nudges.');
+        return;
+      }
+    } else {
+      await cancelWeeklyNudge();
+    }
+    setWeeklyNudge(next);
+    await SecureStore.setItemAsync(NUDGE_WEEKLY_ENABLED_KEY, next ? '1' : '0').catch(() => {});
   };
 
   const doExport = async () => {
@@ -167,11 +265,52 @@ export default function Settings() {
           {settings.lock_enabled === 1 ? (
             <>
               <Divider />
-              <ToggleRow icon="finger-print" label="Biometric unlock" value={settings.biometric_enabled === 1} onToggle={toggleBiometric} />
+              <ToggleRow
+                icon="finger-print"
+                label="Unlock with biometrics"
+                value={biometricAvailable && settings.biometric_enabled === 1}
+                onToggle={toggleBiometric}
+                disabled={!biometricAvailable}
+                hint={!biometricAvailable ? 'No fingerprint or face unlock is set up on this device' : undefined}
+              />
               <Divider />
               <ListRow icon="key" iconTone="primary" title="Change PIN" onPress={() => setPinModal(true)} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
             </>
           ) : null}
+        </Card>
+      </FadeSlide>
+
+      <FadeSlide delay={120}>
+        <SectionHeader title="Reminders & nudges" />
+        <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+          <ToggleRow
+            icon="today"
+            label="Daily summary"
+            value={dailyNudge}
+            onToggle={toggleDailyNudge}
+            hint={`A gentle daily reminder at ${timeLabel(dailyHour, dailyMinute)}`}
+          />
+          {dailyNudge ? (
+            <>
+              <Divider />
+              <ListRow
+                icon="time"
+                iconTone="primary"
+                title="Nudge time"
+                subtitle={timeLabel(dailyHour, dailyMinute)}
+                onPress={() => setTimeModal(true)}
+                right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />}
+              />
+            </>
+          ) : null}
+          <Divider />
+          <ToggleRow
+            icon="calendar"
+            label="Weekly review"
+            value={weeklyNudge}
+            onToggle={toggleWeeklyNudge}
+            hint={`Every Monday at ${timeLabel(WEEKLY_NUDGE_HOUR, 0)}`}
+          />
         </Card>
       </FadeSlide>
 
@@ -190,21 +329,46 @@ export default function Settings() {
 
       <SelectModal visible={industryModal} title="Industry" onClose={() => setIndustryModal(false)} onSelect={chooseIndustry} options={INDUSTRIES.map((i) => ({ id: i.id, label: i.name, sublabel: i.tagline }))} />
       <SelectModal visible={currencyModal} title="Currency" onClose={() => setCurrencyModal(false)} onSelect={setCurrency} options={CURRENCIES.map((c) => ({ id: c.code, label: `${c.symbol}  ${c.code}`, sublabel: c.name }))} />
+      <SelectModal
+        visible={timeModal}
+        title="Nudge time"
+        onClose={() => setTimeModal(false)}
+        onSelect={changeDailyTime}
+        selectedId={`${dailyHour}:${dailyMinute}`}
+        options={TIME_OPTIONS.map((o) => ({ id: o.id, label: o.label }))}
+      />
       <PinModal visible={pinModal} onClose={() => setPinModal(false)} onSave={savePin} />
       {busy ? <View style={{ position: 'absolute' }} /> : null}
     </Screen>
   );
 }
 
-function ToggleRow({ icon, label, value, onToggle }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: boolean; onToggle: () => void }) {
+function ToggleRow({
+  icon,
+  label,
+  value,
+  onToggle,
+  disabled,
+  hint,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  value: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  hint?: string;
+}) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md, gap: Spacing.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1, opacity: disabled ? 0.5 : 1 }}>
         <Ionicons name={icon} size={20} color={t.textSecondary} />
-        <Text variant="body" weight="medium">{label}</Text>
+        <View style={{ flex: 1 }}>
+          <Text variant="body" weight="medium">{label}</Text>
+          {hint ? <Text variant="caption" color={t.textMuted}>{hint}</Text> : null}
+        </View>
       </View>
-      <Toggle value={value} onValueChange={onToggle} />
+      <Toggle value={value} onValueChange={onToggle} disabled={disabled} />
     </View>
   );
 }

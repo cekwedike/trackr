@@ -3,22 +3,30 @@ import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { SkeletonList } from '@/components/anim';
+import { useConfirm } from '@/components/confirm';
 import { MovableFab } from '@/components/nav';
 import { AppHeader, CardList, Chip, EmptyState, ListRow, Screen, Segmented } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listIngredients } from '@/db/repos/ingredients';
-import { listProducts } from '@/db/repos/products';
+import { listProducts, restockProduct, suggestedReorder } from '@/db/repos/products';
 import { computeRecipeCost, listRecipes } from '@/db/repos/recipes';
+import type { Product } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useQuickActionCandidates } from '@/hooks/use-fab-actions';
 import { formatQty } from '@/lib/money';
 
 type Tab = 'products' | 'ingredients' | 'recipes';
+type StockFilter = 'all' | 'low';
+
+function isLowProduct(p: Product): boolean {
+  return p.low_stock_threshold > 0 && p.stock <= p.low_stock_threshold;
+}
 
 export default function Inventory() {
   const { money, terms, industry } = useApp();
   const { modules } = industry;
+  const confirm = useConfirm();
 
   const tabs = useMemo(() => {
     const list: { value: Tab; label: string }[] = [{ value: 'products', label: terms.items }];
@@ -28,15 +36,40 @@ export default function Inventory() {
   }, [modules.ingredients, modules.recipes, terms.items, terms.ingredients, terms.productionLabel]);
 
   const [tab, setTab] = useState<Tab>('products');
+  const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+  const [busyId, setBusyId] = useState<number | null>(null);
   const activeTab: Tab = tabs.some((x) => x.value === tab) ? tab : 'products';
   const { actions, defaultKeys } = useQuickActionCandidates();
 
-  const { data } = useAsyncData(async () => {
+  const { data, reload } = useAsyncData(async () => {
     const [products, ingredients, recipes] = await Promise.all([listProducts(), listIngredients(), listRecipes()]);
     const recipeCosts: Record<number, number> = {};
     for (const r of recipes) recipeCosts[r.id] = await computeRecipeCost(r.id);
     return { products, ingredients, recipes, recipeCosts };
   }, []);
+
+  const lowProducts = useMemo(() => (data ? data.products.filter(isLowProduct) : []), [data]);
+  const shownProducts = stockFilter === 'low' ? lowProducts : data?.products ?? [];
+
+  const onRestock = async (p: Product) => {
+    const qty = suggestedReorder(p);
+    const choice = await confirm({
+      title: `Restock ${p.name}?`,
+      message: `Add ${formatQty(qty)} ${p.unit} to bring stock back above the ${formatQty(p.low_stock_threshold)} ${p.unit} threshold.`,
+      actions: [
+        { label: `Add ${formatQty(qty)} ${p.unit}`, style: 'default', value: 'ok' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice !== 'ok') return;
+    setBusyId(p.id);
+    try {
+      await restockProduct(p.id, qty);
+      reload();
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <>
@@ -52,23 +85,55 @@ export default function Inventory() {
 
         {data && activeTab === 'products' ? (
           data.products.length > 0 ? (
-            <CardList
-              data={data.products}
-              keyExtractor={(p) => p.id}
-              renderItem={(p) => {
-                const low = p.low_stock_threshold > 0 && p.stock <= p.low_stock_threshold;
-                return (
-                  <ListRow
-                    icon="cube"
-                    iconTone={low ? 'warning' : 'primary'}
-                    title={p.name}
-                    subtitle={`${money(p.price)} · ${formatQty(p.stock)} ${p.unit}`}
-                    onPress={() => router.push(`/products/${p.id}`)}
-                    right={low ? <Chip label="Low" tone="warning" /> : undefined}
-                  />
-                );
-              }}
-            />
+            <>
+              <View style={{ marginBottom: Spacing.lg }}>
+                <Segmented
+                  value={stockFilter}
+                  onChange={setStockFilter}
+                  options={[
+                    { value: 'all', label: `All (${data.products.length})` },
+                    { value: 'low', label: lowProducts.length > 0 ? `Needs restock (${lowProducts.length})` : 'Needs restock' },
+                  ]}
+                />
+              </View>
+
+              {shownProducts.length > 0 ? (
+                <CardList
+                  data={shownProducts}
+                  keyExtractor={(p) => p.id}
+                  renderItem={(p) => {
+                    const low = isLowProduct(p);
+                    return (
+                      <ListRow
+                        icon="cube"
+                        iconTone={low ? 'warning' : 'primary'}
+                        title={p.name}
+                        subtitle={`${money(p.price)} · ${formatQty(p.stock)} ${p.unit}`}
+                        onPress={() => router.push(`/products/${p.id}`)}
+                        right={
+                          low ? (
+                            <Chip
+                              label={busyId === p.id ? 'Adding…' : `Restock +${formatQty(suggestedReorder(p))}`}
+                              tone="warning"
+                              icon="add"
+                              onPress={() => onRestock(p)}
+                            />
+                          ) : undefined
+                        }
+                      />
+                    );
+                  }}
+                />
+              ) : (
+                <EmptyState
+                  icon="checkmark-circle-outline"
+                  title="All stocked up"
+                  message={`Every ${terms.item.toLowerCase()} is above its low-stock threshold.`}
+                  secondaryLabel="Show all"
+                  onSecondary={() => setStockFilter('all')}
+                />
+              )}
+            </>
           ) : (
             <EmptyState icon="cube-outline" title={`No ${terms.items.toLowerCase()}`} message={`Add the ${terms.items.toLowerCase()} you sell.`} actionLabel={`Add ${terms.item.toLowerCase()}`} onAction={() => router.push('/products/new')} />
           )

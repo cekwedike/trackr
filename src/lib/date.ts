@@ -37,6 +37,25 @@ export function monthLabel(iso: string): string {
   return dayjs(iso).format('MMM');
 }
 
+/** The selectable dashboard ranges, in display order, with human labels. */
+export const RANGE_OPTIONS: { value: RangeKey; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This week' },
+  { value: 'month', label: 'This month' },
+  { value: 'year', label: 'This year' },
+  { value: 'all', label: 'All time' },
+];
+
+/**
+ * Resolve a named range to a concrete `{ start, end }` window (ISO strings).
+ * A thin, intention-revealing alias over {@link rangeBounds} for call sites that
+ * only need the bounds (e.g. data aggregation) and not the display label.
+ */
+export function resolveRange(key: RangeKey): { start: string; end: string } {
+  const { start, end } = rangeBounds(key);
+  return { start, end };
+}
+
 /** Returns [startInclusiveIso, endExclusiveIso] for a named range relative to now. */
 export function rangeBounds(key: RangeKey): { start: string; end: string; label: string } {
   const now = dayjs();

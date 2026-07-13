@@ -5,6 +5,7 @@ import { getSettings, updateSettings } from '@/db/repos/settings';
 import type { Settings } from '@/db/types';
 import { formatMoney as fmtMoney } from '@/lib/money';
 import { ensureNotificationHandler } from '@/lib/notifications';
+import { runDueRecurring } from '@/lib/recurring';
 
 interface AppContextValue {
   ready: boolean;
@@ -57,6 +58,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setSettings(s);
       setLocked(s.lock_enabled === 1 && s.onboarded === 1);
       setReady(true);
+
+      // Materialise any due recurring expenses in the background. Fire-and-forget
+      // and fully guarded so it can never block or break startup. Only runs once
+      // the user has finished onboarding (so we don't touch a half-set-up app).
+      if (s.onboarded === 1) {
+        runDueRecurring().catch(() => {
+          // recurring materialisation is non-critical for startup
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }

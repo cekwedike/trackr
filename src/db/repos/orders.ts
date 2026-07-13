@@ -1,5 +1,6 @@
 import { getDb } from '@/db/client';
 import type { Order, OrderItem, OrderStatus } from '@/db/types';
+import { logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface OrderItemInput {
@@ -75,6 +76,12 @@ export async function createOrder(input: OrderInput): Promise<number> {
       );
     }
   });
+  await logAudit(
+    'order',
+    orderId,
+    'create',
+    `Created order${input.customer_name ? ` for "${input.customer_name}"` : ''} (total ${total})`,
+  );
   return orderId;
 }
 
@@ -105,16 +112,25 @@ export async function updateOrder(id: number, input: OrderInput): Promise<void> 
       );
     }
   });
+  await logAudit(
+    'order',
+    id,
+    'update',
+    `Updated order${input.customer_name ? ` for "${input.customer_name}"` : ''} (total ${total})`,
+  );
 }
 
 export async function setOrderStatus(id: number, status: OrderStatus): Promise<void> {
   const db = await getDb();
   await db.runAsync('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [status, nowIso(), id]);
+  const label = ORDER_STATUSES.find((s) => s.value === status)?.label ?? status;
+  await logAudit('order', id, 'update', `Set order status to ${label}`);
 }
 
 export async function deleteOrder(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM orders WHERE id = ?', [id]);
+  await logAudit('order', id, 'delete', 'Deleted order');
 }
 
 /** Lightweight row for global search results. */

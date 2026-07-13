@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
+import { useUndo } from '@/components/undo';
 import { Button, Card, IconButton, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
@@ -29,6 +30,7 @@ const nextKey = () => `o-${counter++}`;
 export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () => void }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const { showUndo } = useUndo();
   const { money, currencySymbol, terms } = useApp();
 
   const [customerId, setCustomerId] = useState<number | null>(initial?.customer_id ?? null);
@@ -101,8 +103,31 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
       ],
     });
     if (choice === 'delete') {
-      await deleteOrder(initial.id);
+      // Snapshot the order + its line items before deleting so UNDO can re-create
+      // it (new id). Best-effort: recorded payments history is not restored, but
+      // amount_paid is preserved on the re-created order.
+      const snap = initial;
+      const snapItems = await getOrderItems(snap.id);
+      await deleteOrder(snap.id);
       router.back();
+      showUndo({
+        message: `Deleted ${label}`,
+        onUndo: () =>
+          createOrder({
+            customer_id: snap.customer_id,
+            customer_name: snap.customer_name,
+            status: snap.status,
+            due_at: snap.due_at,
+            amount_paid: snap.amount_paid,
+            note: snap.note,
+            items: snapItems.map((it) => ({
+              product_id: it.product_id,
+              name: it.name,
+              qty: it.qty,
+              unit_price: it.unit_price,
+            })),
+          }),
+      });
     }
   };
 

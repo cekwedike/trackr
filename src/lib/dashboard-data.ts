@@ -3,13 +3,19 @@ import { totalDebts, listCustomers } from '@/db/repos/customers';
 import { sumExpenses } from '@/db/repos/expenses';
 import { listLowIngredients } from '@/db/repos/ingredients';
 import { countActiveOrders, listOrders } from '@/db/repos/orders';
-import { listLowStockProducts } from '@/db/repos/products';
+import { listLowStockProducts, suggestedReorder } from '@/db/repos/products';
 import { listRecipes } from '@/db/repos/recipes';
 import { upcomingReminders } from '@/db/repos/reminders';
 import { sumSales } from '@/db/repos/sales';
 import type { AllocationBucket, Customer, Ingredient, Order, Product, Recipe, Reminder } from '@/db/types';
 import { rangeBounds, type RangeKey } from '@/lib/date';
 import { computeProfit, parseAllocation, type ProfitSummary } from '@/lib/profit';
+
+/** A product that is at/below its low-stock threshold, with a suggested reorder qty. */
+export interface RestockSuggestion {
+  product: Product;
+  suggested: number;
+}
 
 export const EMPTY_DASHBOARD: DashboardData = {
   revenue: 0,
@@ -18,6 +24,7 @@ export const EMPTY_DASHBOARD: DashboardData = {
   expenses: 0,
   profit: computeProfit(0, 0, 0),
   lowProducts: [],
+  restock: [],
   lowIngredients: [],
   activeOrders: 0,
   orders: [],
@@ -37,6 +44,8 @@ export interface DashboardData {
   expenses: number;
   profit: ProfitSummary;
   lowProducts: Product[];
+  /** Actionable restock list derived from `lowProducts` (product + suggested reorder qty). */
+  restock: RestockSuggestion[];
   lowIngredients: Ingredient[];
   activeOrders: number;
   orders: Order[];
@@ -74,6 +83,7 @@ export async function loadDashboard(range: RangeKey, allocationJson: string | nu
     expenses,
     profit: computeProfit(sales.revenue, sales.cogs, expenses),
     lowProducts,
+    restock: lowProducts.map((p) => ({ product: p, suggested: suggestedReorder(p) })),
     lowIngredients,
     activeOrders,
     orders,

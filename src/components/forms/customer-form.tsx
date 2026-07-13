@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
+import { useUndo } from '@/components/undo';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { DateTimeField } from '@/components/pickers';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { fromMinor, parseMoney } from '@/lib/money';
 export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?: () => void }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const { showUndo } = useUndo();
   const { currencySymbol, terms } = useApp();
   const [name, setName] = useState(initial?.name ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
@@ -64,8 +66,25 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
       ],
     });
     if (choice === 'delete') {
-      await deleteCustomer(initial.id);
+      // Snapshot the customer before deleting so UNDO can re-create it (new id).
+      // Best-effort: linked notes and recorded debt payments are not restored,
+      // but the outstanding debt_balance is preserved on the re-created record.
+      const snap = initial;
+      await deleteCustomer(snap.id);
       router.back();
+      showUndo({
+        message: `Deleted ${label}`,
+        onUndo: () =>
+          createCustomer({
+            name: snap.name,
+            phone: snap.phone,
+            email: snap.email,
+            birthday: snap.birthday,
+            address: snap.address,
+            note: snap.note,
+            debt_balance: snap.debt_balance,
+          }),
+      });
     }
   };
 

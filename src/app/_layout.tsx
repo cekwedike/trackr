@@ -18,7 +18,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
 import { ConfirmProvider } from '@/components/confirm';
+import { UndoProvider } from '@/components/undo';
 import { Button, Text } from '@/components/ui';
+import { WhatsNewSheet } from '@/components/whats-new';
 import { Colors, Spacing } from '@/constants/theme';
 import { AppProvider, useApp } from '@/context/app-context';
 import { useThemeName } from '@/hooks/use-theme';
@@ -136,7 +138,11 @@ export default function RootLayout() {
             <ThemeProvider value={navTheme}>
               <StatusBar style="light" />
               <ConfirmProvider>
-                <AppGate />
+                <UndoProvider>
+                  <AppGate />
+                  {/* Global overlay: shows the changelog once after an app update. */}
+                  <WhatsNewSheet />
+                </UndoProvider>
               </ConfirmProvider>
             </ThemeProvider>
           </AppProvider>

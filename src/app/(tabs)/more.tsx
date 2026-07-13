@@ -34,8 +34,11 @@ export default function More() {
     const money: Item[] = [];
     if (modules.sales) money.push({ icon: 'cart', tone: 'success', title: `${terms.sales} history`, subtitle: `All recorded ${terms.sales.toLowerCase()}`, href: '/sales' });
     money.push({ icon: 'wallet', tone: 'danger', title: 'Expenses', subtitle: 'Track what you spend', href: '/expenses' });
+    money.push({ icon: 'repeat', tone: 'warning', title: 'Recurring expenses', subtitle: 'Auto-log bills on a schedule', href: '/recurring' as Href });
     money.push({ icon: 'calculator', tone: 'primary', title: 'Profit Calculator', subtitle: 'Profit & allocation', href: '/profit' });
     money.push({ icon: 'bar-chart', tone: 'accent', title: 'Analytics', subtitle: 'Trends & best sellers', href: '/analytics' });
+    money.push({ icon: 'stats-chart', tone: 'primary', title: 'Reports', subtitle: 'Charts, trends & top lists', href: '/reports' as Href });
+    money.push({ icon: 'cash', tone: 'warning', title: 'Receivables', subtitle: 'See who owes you money', href: '/debtors' as Href });
     g.push({ title: 'Money', items: money });
 
     const rel: Item[] = [];
@@ -54,6 +57,7 @@ export default function More() {
         { icon: 'search', tone: 'accent', title: 'Search', subtitle: `Find ${terms.sales.toLowerCase()}, ${terms.customers.toLowerCase()}, notes & more`, href: '/search' },
         { icon: 'document-text', tone: 'info', title: 'Notes', subtitle: 'Jot down ideas & to-dos', href: '/notes' },
         { icon: 'alarm', tone: 'primary', title: 'Reminders', subtitle: 'Never forget a task', href: '/reminders' },
+        { icon: 'time', tone: 'accent', title: 'Activity log', subtitle: 'Recent changes', href: '/activity' as Href },
       ],
     });
     return g;
@@ -63,6 +67,7 @@ export default function More() {
     () => [
       ...groups.flatMap((grp) => grp.items.map((it) => ({ key: String(it.href), icon: it.icon, label: it.title, onPress: () => router.push(it.href) }))),
       { key: 'faq', icon: 'help-circle' as IconName, label: 'Help & FAQ', onPress: () => router.push('/faq') },
+      { key: 'data', icon: 'cloud-upload' as IconName, label: 'Data & backup', onPress: () => router.push('/data' as Href) },
       { key: 'settings', icon: 'settings' as IconName, label: 'Settings', onPress: () => router.push('/settings') },
     ],
     [groups],
@@ -90,6 +95,8 @@ export default function More() {
             ))}
             <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
               <ListRow icon="help-circle" iconTone="info" title="Help & FAQ" subtitle="Answers, how-tos & tips" onPress={() => router.push('/faq')} right={<Chevron />} />
+              <View style={{ height: 1, backgroundColor: t.border }} />
+              <ListRow icon="cloud-upload" iconTone="success" title="Data & backup" subtitle="Export, restore & sample data" onPress={() => router.push('/data' as Href)} right={<Chevron />} />
               <View style={{ height: 1, backgroundColor: t.border }} />
               <ListRow icon="settings" iconTone="primary" title="Settings" subtitle="Business, currency, security, backup" onPress={() => router.push('/settings')} right={<Chevron />} />
             </Card>
@@ -120,6 +127,8 @@ export default function More() {
       <SectionHeader title="App" />
       <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
         <ListRow icon="help-circle" iconTone="info" title="Help & FAQ" subtitle="Answers, how-tos & tips" onPress={() => router.push('/faq')} right={<Chevron />} />
+        <View style={{ height: 1, backgroundColor: t.border }} />
+        <ListRow icon="cloud-upload" iconTone="success" title="Data & backup" subtitle="Export, restore & sample data" onPress={() => router.push('/data' as Href)} right={<Chevron />} />
         <View style={{ height: 1, backgroundColor: t.border }} />
         <ListRow icon="settings" iconTone="primary" title="Settings" subtitle="Business, currency, security, backup" onPress={() => router.push('/settings')} right={<Chevron />} />
       </Card>

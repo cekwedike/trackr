@@ -1,21 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AllocationDonut, AnimatedCounter, Aurora, DONUT_COLORS, GradientBackdrop, ProfitGauge, Sparkline, TiltCard, Waveform } from '@/components/anim';
 import { AnimatedGrid } from '@/components/nav';
+import { useConfirm } from '@/components/confirm';
 import { HelpTip } from '@/components/help';
-import { Card, Chip, ListRow, SectionHeader, Text } from '@/components/ui';
+import { Card, Chip, Collapsible, ListRow, Text } from '@/components/ui';
 import { useColumns } from '@/hooks/use-columns';
 import { useTheme } from '@/hooks/use-theme';
 import { Radius, Shadow, Spacing } from '@/constants/theme';
 import { QUICK_ACTION_META } from '@/constants/quick-actions';
 import { useApp } from '@/context/app-context';
 import { ORDER_STATUSES } from '@/db/repos/orders';
-import type { DashboardData } from '@/lib/dashboard-data';
+import { restockProduct } from '@/db/repos/products';
+import type { DashboardData, RestockSuggestion } from '@/lib/dashboard-data';
 import { hexToRgba, shade } from '@/lib/color';
 import { formatDate, fromNow, rangeBounds, type RangeKey } from '@/lib/date';
+import { formatQty } from '@/lib/money';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -23,15 +26,59 @@ export interface WidgetProps {
   data: DashboardData;
   range: RangeKey;
   setRange: (r: RangeKey) => void;
+  /** Reload the dashboard aggregation after an inline mutation (e.g. a restock). */
+  reload?: () => void;
 }
 
 const WHITE = '#FFFFFF';
-const RANGES: { value: RangeKey; label: string }[] = [
-  { value: 'today', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
-  { value: 'year', label: 'Year' },
-];
+
+// ---------------------------------------------------------------- Collapsible section
+function SeeAll({ label, onPress }: { label: string; onPress: () => void }) {
+  const t = useTheme();
+  return (
+    <Pressable onPress={onPress} hitSlop={8}>
+      <Text variant="label" color={t.primary}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** A dashboard section that can be collapsed/expanded; the choice is remembered per widget. */
+function Section({
+  id,
+  title,
+  icon,
+  action,
+  onAction,
+  count,
+  gap = Spacing.sm,
+  card = true,
+  children,
+}: {
+  id: string;
+  title: string;
+  icon?: IconName;
+  action?: string;
+  onAction?: () => void;
+  count?: number | string;
+  gap?: number;
+  card?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Collapsible
+      card={card}
+      persistKey={`dash.${id}`}
+      title={title}
+      icon={icon}
+      count={count}
+      headerRight={action && onAction ? <SeeAll label={action} onPress={onAction} /> : undefined}
+      style={{ marginBottom: Spacing.lg }}
+      contentStyle={{ gap, paddingBottom: Spacing.md }}
+    >
+      {children}
+    </Collapsible>
+  );
+}
 
 // ---------------------------------------------------------------- Hero
 function HeroStat({ label, value }: { label: string; value: string }) {
@@ -51,7 +98,7 @@ function HeroStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function HeroRevenue({ data, range, setRange }: WidgetProps) {
+function HeroRevenue({ data, range }: WidgetProps) {
   const { money, settings, accent, industry } = useApp();
   const from = accent;
   const to = shade(accent, -0.4);
@@ -95,34 +142,6 @@ function HeroRevenue({ data, range, setRange }: WidgetProps) {
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
           <HeroStat label="Expenses" value={money(data.expenses)} />
           <HeroStat label="Net profit" value={money(data.profit.netProfit)} />
-        </View>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            backgroundColor: hexToRgba(WHITE, 0.16),
-            borderRadius: Radius.pill,
-            padding: 3,
-          }}
-        >
-          {RANGES.map((r) => {
-            const active = r.value === range;
-            return (
-              <Pressable
-                key={r.value}
-                onPress={() => setRange(r.value)}
-                style={{
-                  flex: 1,
-                  paddingVertical: Spacing.xs + 2,
-                  borderRadius: Radius.pill,
-                  alignItems: 'center',
-                  backgroundColor: active ? WHITE : 'transparent',
-                }}
-              >
-                <Text variant="label" color={active ? accent : hexToRgba(WHITE, 0.9)}>{r.label}</Text>
-              </Pressable>
-            );
-          })}
         </View>
       </View>
     </TiltCard>
@@ -313,29 +332,26 @@ function OrdersPipeline({ data }: WidgetProps) {
   }));
 
   return (
-    <>
-      <SectionHeader title={terms.orders} action="See all" onAction={() => router.push('/orders' as Href)} />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.md }}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs }}>
-          {counts.map((c) => (
-            <Chip key={c.label} label={`${c.label} · ${c.count}`} />
-          ))}
-        </View>
-        {active.length === 0 ? (
-          <Text variant="caption" color={t.textSecondary}>No open {terms.orders.toLowerCase()} right now.</Text>
-        ) : (
-          active.slice(0, 4).map((o) => (
-            <ListRow
-              key={o.id}
-              title={o.customer_name || `${terms.order} #${o.id}`}
-              subtitle={o.due_at ? `Due ${fromNow(o.due_at)}` : ORDER_STATUSES.find((s) => s.value === o.status)?.label}
-              right={<Text variant="body" weight="semibold" color={orderBalance(o.total, o.amount_paid) > 0 ? t.warning : t.success}>{money(orderBalance(o.total, o.amount_paid))}</Text>}
-              onPress={() => router.push(`/orders/${o.id}` as Href)}
-            />
-          ))
-        )}
-      </Card>
-    </>
+    <Section id="pipeline" title={terms.orders} icon="clipboard-outline" action="See all" onAction={() => router.push('/orders' as Href)} gap={Spacing.md}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs }}>
+        {counts.map((c) => (
+          <Chip key={c.label} label={`${c.label} · ${c.count}`} />
+        ))}
+      </View>
+      {active.length === 0 ? (
+        <Text variant="caption" color={t.textSecondary}>No open {terms.orders.toLowerCase()} right now.</Text>
+      ) : (
+        active.slice(0, 4).map((o) => (
+          <ListRow
+            key={o.id}
+            title={o.customer_name || `${terms.order} #${o.id}`}
+            subtitle={o.due_at ? `Due ${fromNow(o.due_at)}` : ORDER_STATUSES.find((s) => s.value === o.status)?.label}
+            right={<Text variant="body" weight="semibold" color={orderBalance(o.total, o.amount_paid) > 0 ? t.warning : t.success}>{money(orderBalance(o.total, o.amount_paid))}</Text>}
+            onPress={() => router.push(`/orders/${o.id}` as Href)}
+          />
+        ))
+      )}
+    </Section>
   );
 }
 
@@ -350,61 +366,98 @@ function AppointmentsToday({ data }: WidgetProps) {
     .slice(0, 5);
 
   return (
-    <>
-      <SectionHeader title={`Upcoming ${terms.orders.toLowerCase()}`} action="See all" onAction={() => router.push('/orders' as Href)} />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
-        {upcoming.length === 0 ? (
-          <Text variant="caption" color={t.textSecondary}>Nothing scheduled. Enjoy the calm.</Text>
-        ) : (
-          upcoming.map((o) => (
-            <ListRow
-              key={o.id}
-              icon="time-outline"
-              title={o.customer_name || `${terms.order} #${o.id}`}
-              subtitle={formatDate(o.due_at)}
-              right={<Text variant="caption" color={t.textSecondary}>{fromNow(o.due_at)}</Text>}
-              onPress={() => router.push(`/orders/${o.id}` as Href)}
-            />
-          ))
-        )}
-      </Card>
-    </>
+    <Section id="appointments" title={`Upcoming ${terms.orders.toLowerCase()}`} icon="time-outline" action="See all" onAction={() => router.push('/orders' as Href)}>
+      {upcoming.length === 0 ? (
+        <Text variant="caption" color={t.textSecondary}>Nothing scheduled. Enjoy the calm.</Text>
+      ) : (
+        upcoming.map((o) => (
+          <ListRow
+            key={o.id}
+            icon="time-outline"
+            title={o.customer_name || `${terms.order} #${o.id}`}
+            subtitle={formatDate(o.due_at)}
+            right={<Text variant="caption" color={t.textSecondary}>{fromNow(o.due_at)}</Text>}
+            onPress={() => router.push(`/orders/${o.id}` as Href)}
+          />
+        ))
+      )}
+    </Section>
   );
 }
 
-// ---------------------------------------------------------------- Low stock
-function LowStockAlerts({ data }: WidgetProps) {
+// ---------------------------------------------------------------- Restock (low stock)
+/** A single low-stock product row with an inline "Restock" action. */
+function RestockRow({ item, busy, onRestock }: { item: RestockSuggestion; busy: boolean; onRestock: () => void }) {
+  const router = useRouter();
+  const { product, suggested } = item;
+  const out = product.stock <= 0;
+  return (
+    <ListRow
+      icon={out ? 'alert-circle' : 'cube-outline'}
+      iconTone={out ? 'danger' : 'warning'}
+      title={product.name}
+      subtitle={`${formatQty(product.stock)} / ${formatQty(product.low_stock_threshold)} ${product.unit} · reorder ${formatQty(suggested)}`}
+      onPress={() => router.push(`/products/${product.id}` as Href)}
+      right={<Chip label={busy ? 'Adding…' : `Restock +${formatQty(suggested)}`} tone="primary" icon="add" onPress={onRestock} />}
+    />
+  );
+}
+
+function LowStockAlerts({ data, reload }: WidgetProps) {
   const t = useTheme();
   const router = useRouter();
-  const { terms } = useApp();
-  const items = [
-    ...data.lowProducts.map((p) => ({ id: `p${p.id}`, name: p.name, qty: `${p.stock} ${p.unit}`, href: `/products/${p.id}` })),
-    ...data.lowIngredients.map((i) => ({ id: `i${i.id}`, name: i.name, qty: `${i.qty_on_hand} ${i.unit}`, href: `/ingredients/${i.id}` })),
-  ];
+  const confirm = useConfirm();
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const products = data.restock;
+  const ingredients = data.lowIngredients;
+  const total = products.length + ingredients.length;
+
+  const onRestock = async (item: RestockSuggestion) => {
+    const { product, suggested } = item;
+    const choice = await confirm({
+      title: `Restock ${product.name}?`,
+      message: `Add ${formatQty(suggested)} ${product.unit} to bring stock back above the ${formatQty(product.low_stock_threshold)} ${product.unit} threshold.`,
+      actions: [
+        { label: `Add ${formatQty(suggested)} ${product.unit}`, style: 'default', value: 'ok' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    });
+    if (choice !== 'ok') return;
+    setBusyId(product.id);
+    try {
+      await restockProduct(product.id, suggested);
+      reload?.();
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
-    <>
-      <SectionHeader title={`${terms.inventoryLabel} alerts`} action="Manage" onAction={() => router.push('/inventory' as Href)} />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
-        {items.length === 0 ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <Ionicons name="checkmark-circle" size={18} color={t.success} />
-            <Text variant="caption" color={t.textSecondary}>All stocked up — no low items.</Text>
-          </View>
-        ) : (
-          items.slice(0, 5).map((it) => (
+    <Section id="lowStock" title="Restock" icon="cart-outline" count={total || undefined} action="Manage" onAction={() => router.push('/inventory' as Href)}>
+      {total === 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <Ionicons name="checkmark-circle" size={18} color={t.success} />
+          <Text variant="caption" color={t.textSecondary}>All stocked up — nothing to reorder.</Text>
+        </View>
+      ) : (
+        <>
+          {products.slice(0, 5).map((item) => (
+            <RestockRow key={`p${item.product.id}`} item={item} busy={busyId === item.product.id} onRestock={() => onRestock(item)} />
+          ))}
+          {ingredients.slice(0, Math.max(0, 5 - products.length)).map((i) => (
             <ListRow
-              key={it.id}
-              icon="alert-circle-outline"
-              title={it.name}
-              subtitle={`${it.qty} left`}
+              key={`i${i.id}`}
+              icon="flask-outline"
               iconTone="warning"
-              onPress={() => router.push(it.href as Href)}
+              title={i.name}
+              subtitle={`${formatQty(i.qty_on_hand)} / ${formatQty(i.reorder_threshold)} ${i.unit} · reorder`}
+              onPress={() => router.push(`/ingredients/${i.id}` as Href)}
             />
-          ))
-        )}
-      </Card>
-    </>
+          ))}
+        </>
+      )}
+    </Section>
   );
 }
 
@@ -414,21 +467,18 @@ function ProductionQueue({ data }: WidgetProps) {
   const router = useRouter();
   const { industry } = useApp();
   return (
-    <>
-      <SectionHeader title={industry.terms.productionLabel} action="See all" onAction={() => router.push('/recipes' as Href)} />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
-        {data.recipes.length === 0 ? (
-          <Pressable onPress={() => router.push('/recipes/new' as Href)} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs }}>
-            <Ionicons name="add-circle-outline" size={20} color={t.primary} />
-            <Text variant="caption" color={t.textSecondary}>Add your first {industry.terms.productionLabel.toLowerCase()} to track costs.</Text>
-          </Pressable>
-        ) : (
-          data.recipes.slice(0, 5).map((r) => (
-            <ListRow key={r.id} icon="reader-outline" title={r.name} subtitle={`Yields ${r.yield_qty}`} onPress={() => router.push(`/recipes/${r.id}` as Href)} />
-          ))
-        )}
-      </Card>
-    </>
+    <Section id="production" title={industry.terms.productionLabel} icon="reader-outline" action="See all" onAction={() => router.push('/recipes' as Href)}>
+      {data.recipes.length === 0 ? (
+        <Pressable onPress={() => router.push('/recipes/new' as Href)} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs }}>
+          <Ionicons name="add-circle-outline" size={20} color={t.primary} />
+          <Text variant="caption" color={t.textSecondary}>Add your first {industry.terms.productionLabel.toLowerCase()} to track costs.</Text>
+        </Pressable>
+      ) : (
+        data.recipes.slice(0, 5).map((r) => (
+          <ListRow key={r.id} icon="reader-outline" title={r.name} subtitle={`Yields ${r.yield_qty}`} onPress={() => router.push(`/recipes/${r.id}` as Href)} />
+        ))
+      )}
+    </Section>
   );
 }
 
@@ -437,23 +487,20 @@ function BestSellers({ data }: WidgetProps) {
   const t = useTheme();
   const { money } = useApp();
   return (
-    <>
-      <SectionHeader title="Top sellers" />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
-        {data.best.length === 0 ? (
-          <Text variant="caption" color={t.textSecondary}>No sales in this period yet.</Text>
-        ) : (
-          data.best.map((b, i) => (
-            <ListRow
-              key={`${b.name}-${i}`}
-              title={b.name}
-              subtitle={`${b.qty} sold`}
-              right={<Text variant="body" weight="semibold" color={t.success}>{money(b.revenue)}</Text>}
-            />
-          ))
-        )}
-      </Card>
-    </>
+    <Section id="bestSellers" title="Top sellers" icon="ribbon-outline">
+      {data.best.length === 0 ? (
+        <Text variant="caption" color={t.textSecondary}>No sales in this period yet.</Text>
+      ) : (
+        data.best.map((b, i) => (
+          <ListRow
+            key={`${b.name}-${i}`}
+            title={b.name}
+            subtitle={`${b.qty} sold`}
+            right={<Text variant="body" weight="semibold" color={t.success}>{money(b.revenue)}</Text>}
+          />
+        ))
+      )}
+    </Section>
   );
 }
 
@@ -463,9 +510,8 @@ function ClientsSnapshot({ data }: WidgetProps) {
   const router = useRouter();
   const { money, terms, accent } = useApp();
   return (
-    <>
-      <SectionHeader title={terms.customers} action="See all" onAction={() => router.push('/customers' as Href)} />
-      <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg }}>
+    <Section id="clients" title={terms.customers} icon="people-outline" action="See all" onAction={() => router.push('/customers' as Href)} card={false}>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
         <Card style={{ flex: 1, gap: Spacing.xs }}>
           <Ionicons name="people" size={20} color={accent} />
           <AnimatedCounter value={data.customers.length} format={(n) => String(n)} variant="title" weight="bold" />
@@ -477,7 +523,7 @@ function ClientsSnapshot({ data }: WidgetProps) {
           <Text variant="caption" color={t.textSecondary}>Owed to you</Text>
         </Card>
       </View>
-    </>
+    </Section>
   );
 }
 
@@ -488,24 +534,21 @@ function DebtsOwed({ data }: WidgetProps) {
   const { money } = useApp();
   const debtors = data.customers.filter((c) => c.debt_balance > 0).sort((a, b) => b.debt_balance - a.debt_balance).slice(0, 4);
   return (
-    <>
-      <SectionHeader title="Owed to you" action="See all" onAction={() => router.push('/customers' as Href)} />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
-        {debtors.length === 0 ? (
-          <Text variant="caption" color={t.textSecondary}>No outstanding debts. Nice.</Text>
-        ) : (
-          debtors.map((c) => (
-            <ListRow
-              key={c.id}
-              icon="person-outline"
-              title={c.name}
-              right={<Text variant="body" weight="semibold" color={t.warning}>{money(c.debt_balance)}</Text>}
-              onPress={() => router.push(`/customers/${c.id}` as Href)}
-            />
-          ))
-        )}
-      </Card>
-    </>
+    <Section id="debts" title="Owed to you" icon="wallet-outline" action="See all" onAction={() => router.push('/customers' as Href)}>
+      {debtors.length === 0 ? (
+        <Text variant="caption" color={t.textSecondary}>No outstanding debts. Nice.</Text>
+      ) : (
+        debtors.map((c) => (
+          <ListRow
+            key={c.id}
+            icon="person-outline"
+            title={c.name}
+            right={<Text variant="body" weight="semibold" color={t.warning}>{money(c.debt_balance)}</Text>}
+            onPress={() => router.push(`/customers/${c.id}` as Href)}
+          />
+        ))
+      )}
+    </Section>
   );
 }
 
@@ -514,18 +557,15 @@ function UpcomingReminders({ data }: WidgetProps) {
   const t = useTheme();
   const router = useRouter();
   return (
-    <>
-      <SectionHeader title="Reminders" action="See all" onAction={() => router.push('/reminders' as Href)} />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
-        {data.reminders.length === 0 ? (
-          <Text variant="caption" color={t.textSecondary}>No upcoming reminders.</Text>
-        ) : (
-          data.reminders.map((r) => (
-            <ListRow key={r.id} icon="alarm-outline" title={r.title} subtitle={fromNow(r.due_at)} />
-          ))
-        )}
-      </Card>
-    </>
+    <Section id="reminders" title="Reminders" icon="alarm-outline" action="See all" onAction={() => router.push('/reminders' as Href)}>
+      {data.reminders.length === 0 ? (
+        <Text variant="caption" color={t.textSecondary}>No upcoming reminders.</Text>
+      ) : (
+        data.reminders.map((r) => (
+          <ListRow key={r.id} icon="alarm-outline" title={r.title} subtitle={fromNow(r.due_at)} />
+        ))
+      )}
+    </Section>
   );
 }
 
@@ -536,19 +576,16 @@ function ExpensesBreakdown({ data }: WidgetProps) {
   const { money } = useApp();
   const series = data.trend.map((p) => p.expenses);
   return (
-    <>
-      <SectionHeader title="Expenses trend" action="See all" onAction={() => router.push('/expenses' as Href)} />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.md }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <View>
-            <Text variant="caption" color={t.textSecondary}>This period</Text>
-            <Text variant="title" weight="bold" color={t.danger}>{money(data.expenses)}</Text>
-          </View>
-          <Text variant="caption" color={t.textMuted}>Last 6 months</Text>
+    <Section id="expenses" title="Expenses trend" icon="trending-down-outline" action="See all" onAction={() => router.push('/expenses' as Href)} gap={Spacing.md}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <View>
+          <Text variant="caption" color={t.textSecondary}>This period</Text>
+          <Text variant="title" weight="bold" color={t.danger}>{money(data.expenses)}</Text>
         </View>
-        <Sparkline data={series.length ? series : [0, 0]} color={t.danger} height={52} />
-      </Card>
-    </>
+        <Text variant="caption" color={t.textMuted}>Last 6 months</Text>
+      </View>
+      <Sparkline data={series.length ? series : [0, 0]} color={t.danger} height={52} />
+    </Section>
   );
 }
 
@@ -559,26 +596,23 @@ function CashLedger({ data }: WidgetProps) {
   const series = data.trend.map((p) => p.profit);
   const balance = data.revenue - data.expenses;
   return (
-    <>
-      <SectionHeader title="Cash book" />
-      <Card style={{ marginBottom: Spacing.lg, gap: Spacing.md }}>
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-          <View style={{ flex: 1 }}>
-            <Text variant="caption" color={t.textSecondary}>Money in</Text>
-            <Text variant="subtitle" weight="bold" color={t.success}>{money(data.revenue)}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text variant="caption" color={t.textSecondary}>Money out</Text>
-            <Text variant="subtitle" weight="bold" color={t.danger}>{money(data.expenses)}</Text>
-          </View>
+    <Section id="ledger" title="Cash book" icon="book-outline" gap={Spacing.md}>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <Text variant="caption" color={t.textSecondary}>Money in</Text>
+          <Text variant="subtitle" weight="bold" color={t.success}>{money(data.revenue)}</Text>
         </View>
-        <View>
-          <Text variant="caption" color={t.textSecondary}>Balance</Text>
-          <AnimatedCounter value={balance} format={money} variant="display" weight="bold" color={balance >= 0 ? t.text : t.danger} />
+        <View style={{ flex: 1 }}>
+          <Text variant="caption" color={t.textSecondary}>Money out</Text>
+          <Text variant="subtitle" weight="bold" color={t.danger}>{money(data.expenses)}</Text>
         </View>
-        <Sparkline data={series.length ? series : [0, 0]} color={accent} height={54} />
-      </Card>
-    </>
+      </View>
+      <View>
+        <Text variant="caption" color={t.textSecondary}>Balance</Text>
+        <AnimatedCounter value={balance} format={money} variant="display" weight="bold" color={balance >= 0 ? t.text : t.danger} />
+      </View>
+      <Sparkline data={series.length ? series : [0, 0]} color={accent} height={54} />
+    </Section>
   );
 }
 

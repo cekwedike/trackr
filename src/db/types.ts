@@ -203,3 +203,50 @@ export interface StockMovement {
   reason: string | null;
   created_at: string;
 }
+
+/** A recorded payment against an order balance or a customer's outstanding debt. */
+export interface Payment {
+  id: number;
+  kind: 'order' | 'debt';
+  ref_id: number; // order id when kind='order', customer id when kind='debt'
+  amount: number;
+  method: string;
+  note: string | null;
+  created_at: string;
+}
+
+/** A rule that auto-creates a recurring expense on a cadence. */
+export interface RecurringRule {
+  id: number;
+  kind: 'expense';
+  amount: number;
+  category: string | null;
+  description: string | null;
+  payment_method: string | null;
+  cadence: 'daily' | 'weekly' | 'monthly';
+  next_run: string;
+  last_run: string | null;
+  active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A single entry in the activity/audit log. */
+export interface AuditEntry {
+  id: number;
+  entity: string;
+  entity_id: number | null;
+  action: 'create' | 'update' | 'delete';
+  summary: string;
+  created_at: string;
+}
+
+/** A file/photo attached to a sale or expense. */
+export interface Attachment {
+  id: number;
+  entity: 'sale' | 'expense';
+  entity_id: number;
+  uri: string;
+  mime: string | null;
+  created_at: string;
+}

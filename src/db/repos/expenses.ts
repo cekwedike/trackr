@@ -1,5 +1,6 @@
 import { getDb } from '@/db/client';
 import type { Expense } from '@/db/types';
+import { logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface ExpenseInput {
@@ -40,6 +41,7 @@ export async function createExpense(input: ExpenseInput): Promise<number> {
      VALUES (?, ?, ?, ?, ?, ?)`,
     [input.occurred_at, input.amount, input.description ?? null, input.category ?? null, input.payment_method ?? null, nowIso()],
   );
+  await logAudit('expense', res.lastInsertRowId, 'create', `Recorded expense (${input.amount})`);
   return res.lastInsertRowId;
 }
 
@@ -49,11 +51,13 @@ export async function updateExpense(id: number, input: ExpenseInput): Promise<vo
     `UPDATE expenses SET occurred_at = ?, amount = ?, description = ?, category = ?, payment_method = ? WHERE id = ?`,
     [input.occurred_at, input.amount, input.description ?? null, input.category ?? null, input.payment_method ?? null, id],
   );
+  await logAudit('expense', id, 'update', `Updated expense (${input.amount})`);
 }
 
 export async function deleteExpense(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM expenses WHERE id = ?', [id]);
+  await logAudit('expense', id, 'delete', 'Deleted expense');
 }
 
 /** Lightweight row for global search results. */

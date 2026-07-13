@@ -21,6 +21,11 @@ const TABLES = [
   'links',
   'reminders',
   'stock_movements',
+  'profit_records',
+  'payments',
+  'recurring_rules',
+  'audit_log',
+  'attachments',
 ];
 
 export interface BackupPayload {

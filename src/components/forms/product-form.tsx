@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
+import { useUndo } from '@/components/undo';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { SelectField, SelectModal } from '@/components/pickers';
@@ -20,6 +21,7 @@ const UNITS = ['pcs', 'pack', 'box', 'kg', 'g', 'litre', 'ml', 'plate', 'bottle'
 export function ProductForm({ initial }: { initial?: Product }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const { showUndo } = useUndo();
   const { currencySymbol, money } = useApp();
 
   const [name, setName] = useState(initial?.name ?? '');
@@ -86,8 +88,28 @@ export function ProductForm({ initial }: { initial?: Product }) {
       ],
     });
     if (choice === 'delete') {
-      await deleteProduct(initial.id);
+      // Snapshot the product before deleting so UNDO can re-create it (new id).
+      // Best-effort: stock-movement history is not restored, but the current
+      // stock level and all product fields are preserved.
+      const snap = initial;
+      await deleteProduct(snap.id);
       router.back();
+      showUndo({
+        message: 'Deleted product',
+        onUndo: () =>
+          createProduct({
+            name: snap.name,
+            category: snap.category,
+            sku: snap.sku,
+            price: snap.price,
+            cost: snap.cost,
+            stock: snap.stock,
+            unit: snap.unit,
+            low_stock_threshold: snap.low_stock_threshold,
+            image_uri: snap.image_uri,
+            notes: snap.notes,
+          }),
+      });
     }
   };
 

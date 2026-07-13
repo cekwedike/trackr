@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
+import { useUndo } from '@/components/undo';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { ENTITY_ROUTE, entityMeta } from '@/components/notes/entities';
 import { useNoteColorTokens } from '@/components/notes/palette';
@@ -15,6 +16,7 @@ import { listOrders } from '@/db/repos/orders';
 import { listProducts } from '@/db/repos/products';
 import {
   addEntityLink,
+  createNote,
   deleteNote,
   getNote,
   getOutgoingLinks,
@@ -29,6 +31,7 @@ import { useTheme } from '@/hooks/use-theme';
 export default function NoteEditor() {
   const t = useTheme();
   const confirm = useConfirm();
+  const { showUndo } = useUndo();
   const { id } = useLocalSearchParams<{ id: string }>();
   const noteId = Number(id);
 
@@ -85,8 +88,23 @@ export default function NoteEditor() {
       ],
     });
     if (choice === 'delete') {
+      // Snapshot the note's content before deleting. UNDO re-creates the note
+      // (new id). Best-effort: outgoing/entity links are not restored.
+      const snap = data?.note;
       await deleteNote(noteId);
       router.back();
+      if (snap) {
+        showUndo({
+          message: 'Deleted note',
+          onUndo: () =>
+            createNote({
+              title: snap.title,
+              body: snap.body,
+              pinned: snap.pinned,
+              color: snap.color,
+            }),
+        });
+      }
     }
   };
 
