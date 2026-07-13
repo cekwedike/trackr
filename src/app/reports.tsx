@@ -181,9 +181,9 @@ export default function ReportsScreen() {
           <TotalRow label="Revenue" value={money(data.totals.revenue)} color={t.success} />
           <TotalRow label="Expenses" value={`- ${money(data.totals.expenses)}`} color={t.danger} />
           <Divider />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text variant="subtitle">Net profit</Text>
-            <Text variant="subtitle" color={data.totals.netProfit >= 0 ? t.success : t.danger}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: Spacing.sm }}>
+            <Text variant="subtitle" numberOfLines={1} style={{ flexShrink: 1 }}>Net profit</Text>
+            <Text variant="subtitle" color={data.totals.netProfit >= 0 ? t.success : t.danger} numberOfLines={1}>
               {money(data.totals.netProfit)}
             </Text>
           </View>
@@ -429,9 +429,9 @@ function RankRow({
 function TotalRow({ label, value, color }: { label: string; value: string; color?: string }) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-      <Text variant="body" color={t.textSecondary}>{label}</Text>
-      <Text variant="body" weight="semibold" color={color}>{value}</Text>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: Spacing.sm }}>
+      <Text variant="body" color={t.textSecondary} numberOfLines={1} style={{ flexShrink: 1 }}>{label}</Text>
+      <Text variant="body" weight="semibold" color={color} numberOfLines={1}>{value}</Text>
     </View>
   );
 }

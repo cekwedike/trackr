@@ -61,7 +61,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow Trackr to unlock with Face ID."
+          "faceIDPermission": "Use Face ID to unlock Trackr and protect your business data."
         }
       ],
       [

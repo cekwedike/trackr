@@ -15,7 +15,6 @@
  */
 
 import type { MonthlySeriesPoint } from '@/db/repos/reports';
-import { fromMinor } from '@/lib/money';
 import { currentMonthKey, formatMonthKey, monthBounds, shiftMonthKey } from '@/lib/profit';
 
 // ---------- Period selector ----------
@@ -282,22 +281,7 @@ export function buildProfitLine(
 
 // ---------- Compact currency (axis labels) ----------
 
-/**
- * Compact money for tight chart labels, e.g. 1_250_000 minor -> "₦12.5k".
- * Reuses `fromMinor` so it honours the minor-units convention.
- */
-export function formatCompactMoney(minor: number, symbol = '₦'): string {
-  const value = fromMinor(minor ?? 0);
-  const negative = value < 0;
-  const abs = Math.abs(value);
-  let body: string;
-  if (abs >= 1_000_000) body = `${trim(abs / 1_000_000)}M`;
-  else if (abs >= 1_000) body = `${trim(abs / 1_000)}k`;
-  else body = trim(abs);
-  return `${negative ? '-' : ''}${symbol}${body}`;
-}
-
-function trim(n: number): string {
-  const rounded = Math.round(n * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-}
+// The compact chart formatter now lives alongside the canonical money helpers
+// (single source of truth for the minor-units convention). Re-exported here so
+// existing `@/lib/reports` importers keep working unchanged.
+export { formatCompactMoney } from '@/lib/money';

@@ -230,9 +230,9 @@ export default function ProfitScreen() {
           <Row label="Gross profit" value={money(summary?.grossProfit ?? 0)} bold />
           <Row label="Operating expenses" value={`- ${money(summary?.expenses ?? 0)}`} color={t.danger} />
           <Divider />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text variant="subtitle">Net profit</Text>
-            <Text variant="title" color={net >= 0 ? t.success : t.danger}>{money(net)}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: Spacing.sm }}>
+            <Text variant="subtitle" numberOfLines={1} style={{ flexShrink: 1 }}>Net profit</Text>
+            <Text variant="title" color={net >= 0 ? t.success : t.danger} numberOfLines={1}>{money(net)}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' }}>
             <Chip
@@ -460,9 +460,9 @@ function HistoryRow({
 function Row({ label, value, color, bold }: { label: string; value: string; color?: string; bold?: boolean }) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-      <Text variant="body" color={t.textSecondary}>{label}</Text>
-      <Text variant="body" weight={bold ? 'bold' : 'medium'} color={color}>{value}</Text>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: Spacing.sm }}>
+      <Text variant="body" color={t.textSecondary} numberOfLines={2} style={{ flexShrink: 1 }}>{label}</Text>
+      <Text variant="body" weight={bold ? 'bold' : 'medium'} color={color} numberOfLines={1}>{value}</Text>
     </View>
   );
 }

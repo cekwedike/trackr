@@ -17,6 +17,7 @@ import { clearPin, isBiometricAvailable, setPin } from '@/lib/auth';
 import { exportBackup, importBackup } from '@/lib/backup';
 import { dayjs } from '@/lib/date';
 import { cancelDailyNudge, cancelWeeklyNudge, scheduleDailyNudge, scheduleWeeklyNudge } from '@/lib/notifications';
+import { openWhatsNew } from '@/components/whats-new';
 
 // Nudge preferences live in secure-store (the settings table has no columns for
 // them), mirroring the onboarding flags. notifications.ts owns the scheduled
@@ -320,6 +321,13 @@ export default function Settings() {
           <ListRow icon="cloud-upload" iconTone="success" title="Export backup" subtitle="Save all data to a file" onPress={doExport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
           <Divider />
           <ListRow icon="cloud-download" iconTone="warning" title="Restore backup" subtitle="Replace data from a file" onPress={doImport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+        </Card>
+      </FadeSlide>
+
+      <FadeSlide delay={200}>
+        <SectionHeader title="About" />
+        <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+          <ListRow icon="sparkles" iconTone="accent" title="What's new" subtitle="See the latest features & changes" onPress={openWhatsNew} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
         </Card>
       </FadeSlide>
 

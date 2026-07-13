@@ -561,6 +561,7 @@ export function Segmented<T extends string>({
             }}
           >
             <RNText
+              numberOfLines={1}
               style={{
                 color: active ? t.primary : t.textSecondary,
                 fontWeight: active ? FontWeight.semibold : FontWeight.medium,
@@ -634,8 +635,8 @@ export function StatCard({
   const c = toneColor(t, tone);
   return (
     <Card style={[{ gap: Spacing.sm }, style]}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text variant="caption" color={t.textSecondary}>{label}</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.sm }}>
+        <Text variant="caption" color={t.textSecondary} numberOfLines={1} style={{ flexShrink: 1 }}>{label}</Text>
         {icon ? (
           <View style={{ width: 30, height: 30, borderRadius: Radius.sm, backgroundColor: c.bg, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name={icon} size={16} color={c.fg} />
@@ -643,7 +644,7 @@ export function StatCard({
         ) : null}
       </View>
       <Text variant="title" numberOfLines={1}>{value}</Text>
-      {sub ? <Text variant="caption" color={t.textMuted}>{sub}</Text> : null}
+      {sub ? <Text variant="caption" color={t.textMuted} numberOfLines={1}>{sub}</Text> : null}
     </Card>
   );
 }
@@ -766,7 +767,7 @@ export function InfoRow({
           <Ionicons name={icon} size={17} color={c.fg} />
         </View>
       ) : null}
-      <Text variant="body" color={t.textSecondary} style={{ paddingTop: align === 'flex-start' ? 1 : 0 }}>{label}</Text>
+      <Text variant="body" color={t.textSecondary} numberOfLines={2} style={{ flexShrink: 1, paddingTop: align === 'flex-start' ? 1 : 0 }}>{label}</Text>
       <View style={{ flex: 1, alignItems: 'flex-end' }}>
         {right ?? (
           <Text variant="body" weight="semibold" color={valueColor} style={{ textAlign: 'right' }}>{value}</Text>

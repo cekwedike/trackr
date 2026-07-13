@@ -51,6 +51,28 @@ export function formatMoney(
   return `${sign}${symbol}${body}`;
 }
 
+/**
+ * Compact money for tight labels (e.g. chart axes): 1_250_000 minor -> "₦12.5k".
+ * Rounds at the major-unit boundary and reuses the minor-units convention so it
+ * stays consistent with {@link formatMoney}. For a full grouped amount use
+ * {@link formatMoney} instead.
+ */
+export function formatCompactMoney(minor: number, symbol = '₦'): string {
+  const value = fromMinor(minor ?? 0);
+  const negative = value < 0;
+  const abs = Math.abs(value);
+  let body: string;
+  if (abs >= 1_000_000) body = `${trimCompact(abs / 1_000_000)}M`;
+  else if (abs >= 1_000) body = `${trimCompact(abs / 1_000)}k`;
+  else body = trimCompact(abs);
+  return `${negative ? '-' : ''}${symbol}${body}`;
+}
+
+function trimCompact(n: number): string {
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
 /** Format a plain quantity (may be fractional) without a currency symbol. */
 export function formatQty(qty: number): string {
   if (qty == null || isNaN(qty)) return '0';
