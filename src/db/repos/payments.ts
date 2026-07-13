@@ -1,6 +1,6 @@
 import { getDb } from '@/db/client';
 import type { Order, Payment } from '@/db/types';
-import { logAudit } from '@/lib/audit';
+import { auditMoney, logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 /**
@@ -39,7 +39,7 @@ export async function recordOrderPayment(
       orderId,
     ]);
   });
-  await logAudit('payment', orderId, 'create', `Recorded order payment (${Math.round(amount)})`);
+  await logAudit('payment', orderId, 'create', `Recorded order payment of ${await auditMoney(Math.round(amount))}`);
   return db.getFirstAsync<Order>('SELECT * FROM orders WHERE id = ?', [orderId]);
 }
 
@@ -72,7 +72,7 @@ export async function recordDebtPayment(
       customerId,
     ]);
   });
-  await logAudit('payment', customerId, 'create', `Recorded debt payment (${Math.round(amount)})`);
+  await logAudit('payment', customerId, 'create', `Recorded debt payment of ${await auditMoney(Math.round(amount))}`);
   const updated = await db.getFirstAsync<{ debt_balance: number }>(
     'SELECT debt_balance FROM customers WHERE id = ?',
     [customerId],

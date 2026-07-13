@@ -1,6 +1,6 @@
 import { getDb } from '@/db/client';
 import type { PaymentMethod, Sale, SaleItem } from '@/db/types';
-import { logAudit } from '@/lib/audit';
+import { auditMoney, logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface SaleItemInput {
@@ -88,7 +88,7 @@ export async function createSale(input: SaleInput): Promise<number> {
       ]);
     }
   });
-  await logAudit('sale', saleId, 'create', `Recorded sale (total ${total})`);
+  await logAudit('sale', saleId, 'create', `Recorded sale of ${await auditMoney(total)}`);
   return saleId;
 }
 
@@ -127,7 +127,7 @@ export async function deleteSale(id: number): Promise<void> {
     // sale_items rows are removed via ON DELETE CASCADE.
     await db.runAsync('DELETE FROM sales WHERE id = ?', [id]);
   });
-  await logAudit('sale', id, 'delete', `Deleted sale (total ${sale.total})`);
+  await logAudit('sale', id, 'delete', `Deleted sale of ${await auditMoney(sale.total)}`);
 }
 
 /** Lightweight row for global search results. */

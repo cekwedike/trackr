@@ -1,8 +1,26 @@
 import { getDb } from '@/db/client';
+import { getSettings } from '@/db/repos/settings';
 import type { AuditEntry } from '@/db/types';
 import { nowIso } from '@/lib/date';
+import { formatMoney } from '@/lib/money';
 
 export type AuditAction = AuditEntry['action'];
+
+/**
+ * Format a minor-units money value for a human-readable activity summary, using
+ * the user's configured currency symbol. Audit logging is best-effort, so if
+ * settings can't be read we fall back to the default symbol rather than throw.
+ * This keeps raw internal values (e.g. `150000`) out of the Activity log — they
+ * always render as proper money (e.g. `₦1,500`).
+ */
+export async function auditMoney(minor: number): Promise<string> {
+  try {
+    const { currency_symbol } = await getSettings();
+    return formatMoney(minor, currency_symbol);
+  } catch {
+    return formatMoney(minor);
+  }
+}
 
 /**
  * Append one row to the activity/audit log — a fire-and-forget record of a

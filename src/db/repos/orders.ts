@@ -1,6 +1,6 @@
 import { getDb } from '@/db/client';
 import type { Order, OrderItem, OrderStatus } from '@/db/types';
-import { logAudit } from '@/lib/audit';
+import { auditMoney, logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export interface OrderItemInput {
@@ -80,7 +80,7 @@ export async function createOrder(input: OrderInput): Promise<number> {
     'order',
     orderId,
     'create',
-    `Created order${input.customer_name ? ` for "${input.customer_name}"` : ''} (total ${total})`,
+    `Created order${input.customer_name ? ` for "${input.customer_name}"` : ''} of ${await auditMoney(total)}`,
   );
   return orderId;
 }
@@ -116,7 +116,7 @@ export async function updateOrder(id: number, input: OrderInput): Promise<void> 
     'order',
     id,
     'update',
-    `Updated order${input.customer_name ? ` for "${input.customer_name}"` : ''} (total ${total})`,
+    `Updated order${input.customer_name ? ` for "${input.customer_name}"` : ''} to ${await auditMoney(total)}`,
   );
 }
 

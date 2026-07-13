@@ -24,7 +24,7 @@ export default function SaleDetail() {
   const t = useTheme();
   const confirm = useConfirm();
   const { showUndo } = useUndo();
-  const { money, settings, accent, currencySymbol } = useApp();
+  const { money, settings, accent, currencySymbol, terms } = useApp();
   const { id } = useLocalSearchParams<{ id: string }>();
   const saleId = Number(id);
   const [sharing, setSharing] = useState(false);
@@ -80,8 +80,8 @@ export default function SaleDetail() {
     if (loading) return null;
     return (
       <Screen>
-        <AppHeader title="Sale" back />
-        <Text variant="body" color={t.textSecondary}>Sale not found.</Text>
+        <AppHeader title={terms.sale} back />
+        <Text variant="body" color={t.textSecondary}>{terms.sale} not found.</Text>
       </Screen>
     );
   }
@@ -122,7 +122,7 @@ export default function SaleDetail() {
 
   return (
     <Screen>
-      <AppHeader title={`Sale #${sale.id}`} back right={<IconButton icon="trash-outline" tone="danger" onPress={remove} />} />
+      <AppHeader title={`${terms.sale} #${sale.id}`} back right={<IconButton icon="trash-outline" tone="danger" onPress={remove} />} />
 
       <DetailHero
         label="Total sale"

@@ -1,6 +1,6 @@
 import { getDb } from '@/db/client';
 import type { RecurringRule } from '@/db/types';
-import { logAudit } from '@/lib/audit';
+import { auditMoney, logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
 export type Cadence = RecurringRule['cadence'];
@@ -46,7 +46,7 @@ export async function createRecurringRule(input: RecurringRuleInput): Promise<nu
       now,
     ],
   );
-  await logAudit('recurring', res.lastInsertRowId, 'create', `Created recurring expense (${input.amount})`);
+  await logAudit('recurring', res.lastInsertRowId, 'create', `Created recurring expense of ${await auditMoney(input.amount)}`);
   return res.lastInsertRowId;
 }
 
@@ -67,7 +67,7 @@ export async function updateRecurringRule(id: number, patch: RecurringRuleInput)
       id,
     ],
   );
-  await logAudit('recurring', id, 'update', `Updated recurring expense (${patch.amount})`);
+  await logAudit('recurring', id, 'update', `Updated recurring expense to ${await auditMoney(patch.amount)}`);
 }
 
 export async function deleteRecurringRule(id: number): Promise<void> {
