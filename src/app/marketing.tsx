@@ -57,6 +57,8 @@ export default function MarketingScreen() {
   const [ideaText, setIdeaText] = useState('');
   const [editingIdeaId, setEditingIdeaId] = useState<number | null>(null);
   const [editingIdeaTitle, setEditingIdeaTitle] = useState('');
+  const [savingIdeaId, setSavingIdeaId] = useState<number | null>(null);
+  const [addingIdea, setAddingIdea] = useState(false);
 
   const { data, reload } = useAsyncData(async () => {
     await Promise.all([ensureDefaultTemplates(), ensureDefaultIdeas()]);
@@ -184,13 +186,28 @@ export default function MarketingScreen() {
                     autoFocus
                   />
                   <Chip
-                    label="Save"
+                    label={savingIdeaId === idea.id ? 'Saving…' : 'Save'}
                     onPress={async () => {
+                      if (savingIdeaId != null) return;
                       const next = editingIdeaTitle.trim();
-                      setEditingIdeaId(null);
-                      if (next && next !== idea.title) {
+                      if (!next || next === idea.title) {
+                        setEditingIdeaId(null);
+                        setEditingIdeaTitle('');
+                        return;
+                      }
+                      setSavingIdeaId(idea.id);
+                      try {
                         await updateMarketingIdea(idea.id, next);
+                        setEditingIdeaId(null);
+                        setEditingIdeaTitle('');
                         reload();
+                      } catch (e) {
+                        Alert.alert(
+                          'Couldn’t save',
+                          toUserMessage(e, 'Couldn’t save this idea. Please try again.'),
+                        );
+                      } finally {
+                        setSavingIdeaId(null);
                       }
                     }}
                   />
@@ -233,11 +250,23 @@ export default function MarketingScreen() {
             title="Add to checklist"
             icon="add"
             variant="secondary"
+            loading={addingIdea}
             onPress={async () => {
-              if (!ideaText.trim()) return;
-              await createMarketingIdea(ideaText.trim());
-              setIdeaText('');
-              reload();
+              const next = ideaText.trim();
+              if (!next || addingIdea) return;
+              setAddingIdea(true);
+              try {
+                await createMarketingIdea(next);
+                setIdeaText('');
+                reload();
+              } catch (e) {
+                Alert.alert(
+                  'Couldn’t save',
+                  toUserMessage(e, 'Couldn’t add this idea. Please try again.'),
+                );
+              } finally {
+                setAddingIdea(false);
+              }
             }}
           />
         </Card>
