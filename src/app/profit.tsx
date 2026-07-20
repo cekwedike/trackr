@@ -29,6 +29,7 @@ import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/lib/date';
 import { toUserMessage } from '@/lib/errors';
+import { markProfitSplitSet } from '@/lib/onboarding';
 import {
   allocationTotal,
   computeProfit,
@@ -127,7 +128,7 @@ export default function ProfitScreen() {
     const choice = await confirm({
       title: `Use ${industry.name} template?`,
       message:
-        'This replaces the buckets below with the recommended split. Nothing is saved until you record the month.',
+        'This replaces the buckets below with the recommended split. Tap Done to save it as your default, or Record to save this month’s close.',
       actions: [
         { label: 'Use template', value: 'use' },
         { label: 'Cancel', style: 'cancel', value: 'cancel' },
@@ -151,6 +152,32 @@ export default function ProfitScreen() {
       return;
     }
     setDraft(slices.map((s) => ({ name: s.name, percent: String(s.percent) })));
+  };
+
+  const saveSplitTemplate = async (buckets: AllocationBucket[]) => {
+    await updateSettings({ profit_allocation: JSON.stringify(buckets) });
+    await reloadSettings();
+    await markProfitSplitSet();
+  };
+
+  /** Leave edit mode; persist a balanced split as the global template. */
+  const toggleEditing = async () => {
+    if (record?.locked === 1) return;
+    if (!editing) {
+      setEditing(true);
+      return;
+    }
+    if (!balanced) {
+      Alert.alert('Allocation must total 100%', `Your buckets currently add up to ${round1(total)}%.`);
+      return;
+    }
+    try {
+      await saveSplitTemplate(toBuckets(draft));
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save your profit split. Please try again.'));
+      return;
+    }
+    setEditing(false);
   };
 
   const recordMonth = async () => {
@@ -178,9 +205,11 @@ export default function ProfitScreen() {
       return;
     }
     // Only the current month updates the global starting template for future months.
+    // Always mark the checklist flag — recording a month is also "setting" a split.
     if (isCurrent) {
-      await updateSettings({ profit_allocation: JSON.stringify(cleanBuckets) });
-      await reloadSettings();
+      await saveSplitTemplate(cleanBuckets);
+    } else {
+      await markProfitSplitSet();
     }
     seedRef.current = ''; // force reseed from the freshly saved snapshot
     await reload();
@@ -301,12 +330,12 @@ export default function ProfitScreen() {
             points={[
               { term: 'Buckets', desc: 'Named pots of money you want to fund, e.g. Savings or Reinvest.' },
               { term: 'Percent (%)', desc: 'The share of profit each bucket receives. All buckets together must total 100%.' },
-              { term: 'Recording a month', desc: 'Saves that month’s profit and split to your history. Recording the current month also sets your default split going forward.' },
+              { term: 'Recording a month', desc: 'Saves that month’s profit and split to your history. Recording the current month also updates your default split. Tapping Done after editing saves the split without closing the month.' },
             ]}
             tip="Try the industry template, an even split, or copy last month to start fast."
           />
         </View>
-        <Pressable onPress={() => { if (record?.locked !== 1) setEditing((v) => !v); }} hitSlop={8}>
+        <Pressable onPress={toggleEditing} hitSlop={8}>
           <Text variant="label" color={record?.locked === 1 ? t.textMuted : t.primary}>
             {record?.locked === 1 ? 'Locked' : editing ? 'Done' : 'Edit split'}
           </Text>

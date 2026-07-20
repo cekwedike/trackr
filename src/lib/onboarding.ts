@@ -14,6 +14,7 @@ import type { Settings } from '@/db/types';
 
 const DISMISS_KEY = 'onboarding.checklist.dismissed';
 const FAQ_VISITED_KEY = 'onboarding.faqVisited';
+const PROFIT_SPLIT_KEY = 'onboarding.profitSplitSet';
 
 type Tone = 'primary' | 'success' | 'warning' | 'danger' | 'accent' | 'info';
 
@@ -39,6 +40,16 @@ export async function markFaqVisited(): Promise<void> {
   await SecureStore.setItemAsync(FAQ_VISITED_KEY, '1').catch(() => {});
 }
 
+/**
+ * Records that the user has saved a profit split from the Profit screen.
+ * Onboarding seeds `settings.profit_allocation` with an industry default, so
+ * presence of that field alone cannot mean "done" — this flag is set when the
+ * Profit UI actually writes the split (Done / Record).
+ */
+export async function markProfitSplitSet(): Promise<void> {
+  await SecureStore.setItemAsync(PROFIT_SPLIT_KEY, '1').catch(() => {});
+}
+
 /** True once the user has permanently hidden the Getting-started checklist. */
 export async function isChecklistDismissed(): Promise<boolean> {
   try {
@@ -62,16 +73,18 @@ export async function loadOnboardingProgress(
 ): Promise<OnboardingProgress> {
   const { modules, terms } = industry;
 
-  const [sales, products, customers, expenses, recipes, reminders, profitMonths, faqRaw] = await Promise.all([
-    modules.sales ? countSales() : Promise.resolve(0),
-    modules.inventory ? countProducts() : Promise.resolve(0),
-    modules.customers ? countCustomers() : Promise.resolve(0),
-    countExpenses(),
-    modules.recipes ? countRecipes() : Promise.resolve(0),
-    countReminders(),
-    countProfitRecords(),
-    SecureStore.getItemAsync(FAQ_VISITED_KEY).catch(() => null),
-  ]);
+  const [sales, products, customers, expenses, recipes, reminders, profitMonths, faqRaw, profitSplitRaw] =
+    await Promise.all([
+      modules.sales ? countSales() : Promise.resolve(0),
+      modules.inventory ? countProducts() : Promise.resolve(0),
+      modules.customers ? countCustomers() : Promise.resolve(0),
+      countExpenses(),
+      modules.recipes ? countRecipes() : Promise.resolve(0),
+      countReminders(),
+      countProfitRecords(),
+      SecureStore.getItemAsync(FAQ_VISITED_KEY).catch(() => null),
+      SecureStore.getItemAsync(PROFIT_SPLIT_KEY).catch(() => null),
+    ]);
 
   const items: ChecklistItem[] = [];
 
@@ -143,6 +156,11 @@ export async function loadOnboardingProgress(
     });
   }
 
+  // Prefer the Profit-screen save flag (settings.profit_allocation write). Fall
+  // back to recorded months so older installs that already closed a month still
+  // count as done without re-saving the split.
+  const profitSplitDone = profitSplitRaw === '1' || profitMonths > 0;
+
   items.push({
     key: 'profit',
     label: 'Set your profit split',
@@ -150,7 +168,7 @@ export async function loadOnboardingProgress(
     icon: 'calculator',
     tone: 'accent',
     href: '/profit',
-    done: profitMonths > 0,
+    done: profitSplitDone,
   });
 
   items.push({

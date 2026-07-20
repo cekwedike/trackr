@@ -40,12 +40,13 @@ export default function ImportContactsScreen() {
       if (outcome !== 'granted') {
         setBlocked(true);
         setContacts([]);
-        const msg = contactsPermissionMessage(outcome);
-        Alert.alert(msg.title, msg.message, [
-          outcome === 'blocked'
-            ? { text: 'Open Settings', onPress: () => openSystemSettings() }
-            : { text: 'OK' },
-        ]);
+        if (outcome === 'blocked') {
+          const msg = contactsPermissionMessage(outcome);
+          Alert.alert(msg.title, msg.message, [
+            { text: 'Open Settings', onPress: () => openSystemSettings() },
+            { text: 'OK', style: 'cancel' },
+          ]);
+        }
         return;
       }
       const rows = await loadImportableContacts();
@@ -149,9 +150,9 @@ export default function ImportContactsScreen() {
         <EmptyState
           icon="people-outline"
           title="Contacts permission needed"
-          message={contactsPermissionMessage('blocked').message}
-          actionLabel="Open Settings"
-          onAction={() => openSystemSettings()}
+          message="Allow contacts access so Trackr can import people from your phone book. Tap below to try again, or enable Contacts in system Settings."
+          actionLabel="Try again"
+          onAction={() => load()}
         />
       ) : filtered.length === 0 ? (
         <EmptyState

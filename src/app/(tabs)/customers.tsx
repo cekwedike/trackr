@@ -12,9 +12,9 @@ import { useAsyncData } from '@/hooks/use-async-data';
 import { useQuickActionCandidates } from '@/hooks/use-fab-actions';
 import {
   contactsPermissionMessage,
-  ensureContactsAccess,
+  importSelectedContacts,
   openSystemSettings,
-  pickAndImportOneContact,
+  pickContactFields,
 } from '@/lib/contacts-import';
 import { toUserMessage } from '@/lib/errors';
 
@@ -36,21 +36,21 @@ export default function CustomersScreen() {
     if (importBusy) return;
     setImportBusy(true);
     try {
-      const outcome = await ensureContactsAccess();
-      if (outcome !== 'granted') {
-        const msg = contactsPermissionMessage(outcome);
+      const pick = await pickContactFields();
+      if (pick.status === 'cancelled') return;
+      if (pick.status === 'denied') {
+        const msg = contactsPermissionMessage(pick.outcome);
         Alert.alert(msg.title, msg.message, [
-          outcome === 'blocked'
+          pick.outcome === 'blocked'
             ? { text: 'Open Settings', onPress: () => openSystemSettings() }
             : { text: 'OK' },
         ]);
         return;
       }
-      const result = await pickAndImportOneContact();
-      if (result === 'cancelled') return;
+      const result = await importSelectedContacts([pick.contact], 'import');
       await reload();
       Alert.alert(
-        result === 'created' ? 'Contact added' : 'Contact updated',
+        result.created ? 'Contact added' : 'Contact updated',
         `${terms.customer} list refreshed from your address book.`,
       );
     } catch (e) {

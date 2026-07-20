@@ -1,9 +1,6 @@
-/** In-app legal copy for Trackr. Draft for product use — have counsel review before store submission. */
+/** In-app legal copy for Trackr. */
 
 export const LEGAL_LAST_UPDATED = '20 July 2026';
-
-export const LEGAL_REVIEW_NOTE =
-  'This is product draft copy for Trackr. Have a qualified lawyer review it before App Store / Play Store submission or any commercial launch.';
 
 export type LegalSection = {
   heading: string;
@@ -76,7 +73,6 @@ export const TERMS_SECTIONS: LegalSection[] = [
     heading: 'Agreement',
     body: [
       'By downloading or using Trackr, you agree to these Terms of Use. If you do not agree, do not use the App.',
-      LEGAL_REVIEW_NOTE,
     ],
   },
   {

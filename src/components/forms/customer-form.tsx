@@ -16,6 +16,12 @@ import {
   cancelBirthdayNotification,
   scheduleBirthdayNotification,
 } from '@/lib/birthday-notifications';
+import {
+  contactsPermissionMessage,
+  openSystemSettings,
+  pickContactFields,
+} from '@/lib/contacts-import';
+import { toUserMessage } from '@/lib/errors';
 import { fromMinor, parseMoney } from '@/lib/money';
 
 export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?: () => void }) {
@@ -31,7 +37,40 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
   const [debt, setDebt] = useState(initial ? String(fromMinor(initial.debt_balance)) : '0');
   const [hasBirthday, setHasBirthday] = useState(!!initial?.birthday);
   const [birthday, setBirthday] = useState(initial?.birthday ? new Date(initial.birthday) : new Date(2000, 0, 1));
+  const [contactId, setContactId] = useState<string | null>(initial?.contact_id ?? null);
   const [saving, setSaving] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+
+  const importFromContacts = async () => {
+    if (importBusy) return;
+    setImportBusy(true);
+    try {
+      const pick = await pickContactFields();
+      if (pick.status === 'cancelled') return;
+      if (pick.status === 'denied') {
+        const msg = contactsPermissionMessage(pick.outcome);
+        Alert.alert(msg.title, msg.message, [
+          pick.outcome === 'blocked'
+            ? { text: 'Open Settings', onPress: () => openSystemSettings() }
+            : { text: 'OK' },
+        ]);
+        return;
+      }
+      const c = pick.contact;
+      setName(c.name);
+      setPhone(c.phone ?? '');
+      setEmail(c.email ?? '');
+      setContactId(c.id);
+      if (c.birthday) {
+        setHasBirthday(true);
+        setBirthday(new Date(c.birthday));
+      }
+    } catch (e) {
+      Alert.alert('Couldn’t open contacts', toUserMessage(e));
+    } finally {
+      setImportBusy(false);
+    }
+  };
 
   const save = async () => {
     if (!name.trim()) {
@@ -48,7 +87,7 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
         address: address.trim() || null,
         note: note.trim() || null,
         debt_balance: parseMoney(debt),
-        contact_id: initial?.contact_id ?? null,
+        contact_id: contactId,
       };
       let id = initial?.id;
       if (initial) await updateCustomer(initial.id, payload);
@@ -110,6 +149,30 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
   return (
     <Screen>
       <AppHeader title={initial ? `Edit ${terms.customer.toLowerCase()}` : `New ${terms.customer.toLowerCase()}`} back />
+
+      {!initial ? (
+        <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
+          <Button
+            title={importBusy ? 'Opening contacts…' : 'Import from contacts'}
+            icon="people-outline"
+            variant="secondary"
+            size="lg"
+            onPress={importFromContacts}
+            disabled={importBusy || saving}
+          />
+          <Button
+            title="Import many…"
+            icon="download-outline"
+            variant="ghost"
+            size="sm"
+            onPress={() => router.push('/customers/import')}
+            disabled={importBusy || saving}
+          />
+          <Text variant="caption" color={t.textMuted}>
+            Pick someone from your phone book to fill this form, or import several at once.
+          </Text>
+        </Card>
+      ) : null}
 
       <SectionHeader title="Contact" />
       <Card style={{ gap: Spacing.md }}>

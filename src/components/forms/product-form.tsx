@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
@@ -14,6 +13,7 @@ import { useApp } from '@/context/app-context';
 import { adjustProductStock, createProduct, deleteProduct, updateProduct } from '@/db/repos/products';
 import type { Product } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import { pickAttachmentImage } from '@/lib/attachments';
 import { fromMinor, formatQty, parseMoney } from '@/lib/money';
 
 const UNITS = ['pcs', 'pack', 'box', 'kg', 'g', 'litre', 'ml', 'plate', 'bottle', 'bag'];
@@ -38,8 +38,8 @@ export function ProductForm({ initial }: { initial?: Product }) {
   const [saving, setSaving] = useState(false);
 
   const pickImage = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
-    if (!res.canceled && res.assets?.length) setImage(res.assets[0].uri);
+    const picked = await pickAttachmentImage();
+    if (picked) setImage(picked.uri);
   };
 
   const restock = async (sign: number) => {

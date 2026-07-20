@@ -21,12 +21,18 @@
  *
  * Mic ownership: `expo-image-picker` keeps `microphonePermission: false` in
  * app.json so only `expo-audio` owns NSMicrophoneUsageDescription / RECORD_AUDIO.
+ *
+ * Contacts note: SDK 57 still exposes get/requestPermissionsAsync on the main
+ * module (ContactsModule). Prefer those for full-address-book import; single
+ * pick can use Contact.presentPicker() after access is granted.
  */
 import {
   getRecordingPermissionsAsync,
   requestRecordingPermissionsAsync,
 } from 'expo-audio';
 import * as Contacts from 'expo-contacts';
+import * as ImagePicker from 'expo-image-picker';
+import { Alert } from 'react-native';
 
 import { hasNotificationPermission, requestNotificationPermission } from '@/lib/notifications';
 
@@ -54,10 +60,23 @@ export const PermissionRationale = {
   },
 } as const;
 
+export type PermissionKind = keyof typeof PermissionRationale;
+
 function mapContactsStatus(status: Contacts.PermissionStatus): PermissionOutcome {
   if (status === Contacts.PermissionStatus.GRANTED) return 'granted';
   if (status === Contacts.PermissionStatus.DENIED) return 'denied';
   return 'blocked';
+}
+
+/** Show in-app rationale, then resolve true only if the user chooses to continue. */
+export function confirmPermissionRationale(kind: PermissionKind): Promise<boolean> {
+  const r = PermissionRationale[kind];
+  return new Promise((resolve) => {
+    Alert.alert(r.title, r.message, [
+      { text: 'Not now', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'Continue', onPress: () => resolve(true) },
+    ]);
+  });
 }
 
 /**
@@ -76,12 +95,22 @@ export async function hasContactsPermission(): Promise<boolean> {
   return status === Contacts.PermissionStatus.GRANTED;
 }
 
-/** Prompt for contacts access (JIT — call only from an import flow). */
-export async function requestContacts(): Promise<PermissionOutcome> {
+/**
+ * Prompt for contacts access (JIT — call only from an import flow).
+ * When `withRationale` is true (default), shows an in-app explanation before the OS dialog.
+ */
+export async function requestContacts(options?: {
+  withRationale?: boolean;
+}): Promise<PermissionOutcome> {
+  const withRationale = options?.withRationale !== false;
   const existing = await Contacts.getPermissionsAsync();
   if (existing.status === Contacts.PermissionStatus.GRANTED) return 'granted';
   if (existing.status === Contacts.PermissionStatus.DENIED && !existing.canAskAgain) {
     return 'blocked';
+  }
+  if (withRationale) {
+    const ok = await confirmPermissionRationale('contacts');
+    if (!ok) return 'denied';
   }
   const result = await Contacts.requestPermissionsAsync();
   return mapContactsStatus(result.status);
@@ -93,12 +122,82 @@ export async function hasMicrophonePermission(): Promise<boolean> {
   return granted;
 }
 
-/** Prompt for microphone access (JIT — call only before voice recording). */
-export async function requestMicrophone(): Promise<PermissionOutcome> {
+/**
+ * Prompt for microphone access (JIT — call only before voice recording).
+ * When `withRationale` is true (default), shows an in-app explanation before the OS dialog.
+ */
+export async function requestMicrophone(options?: {
+  withRationale?: boolean;
+}): Promise<PermissionOutcome> {
+  const withRationale = options?.withRationale !== false;
   const existing = await getRecordingPermissionsAsync();
   if (existing.granted) return 'granted';
   if (!existing.canAskAgain) return 'blocked';
+  if (withRationale) {
+    const ok = await confirmPermissionRationale('microphone');
+    if (!ok) return 'denied';
+  }
   const result = await requestRecordingPermissionsAsync();
   if (result.granted) return 'granted';
   return result.canAskAgain ? 'denied' : 'blocked';
+}
+
+/** Current photo-library permission without prompting. */
+export async function hasPhotosPermission(): Promise<boolean> {
+  const { granted } = await ImagePicker.getMediaLibraryPermissionsAsync();
+  return granted;
+}
+
+/**
+ * Prompt for photo library access (JIT — call only before picking an image).
+ * On Android 13+ the system picker may not require this; we still request on iOS
+ * and older Android. When already granted (or not needed), returns granted.
+ */
+export async function requestPhotos(options?: {
+  withRationale?: boolean;
+}): Promise<PermissionOutcome> {
+  const withRationale = options?.withRationale !== false;
+  const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
+  if (existing.granted) return 'granted';
+  // Some Android versions report granted=false but canAskAgain with no real prompt needed
+  // after launchImageLibraryAsync — still attempt a polite request when we can.
+  if (!existing.canAskAgain && existing.status === 'denied') return 'blocked';
+  if (withRationale) {
+    const ok = await confirmPermissionRationale('photos');
+    if (!ok) return 'denied';
+  }
+  const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (result.granted) return 'granted';
+  return result.canAskAgain ? 'denied' : 'blocked';
+}
+
+export function photosPermissionMessage(outcome: PermissionOutcome): { title: string; message: string } {
+  if (outcome === 'blocked') {
+    return {
+      title: 'Photo access blocked',
+      message:
+        'Trackr can’t open your photo library. Enable Photos for Trackr in system Settings, then try again.',
+    };
+  }
+  return {
+    title: PermissionRationale.photos.title,
+    message: PermissionRationale.photos.message,
+  };
+}
+
+export function microphonePermissionMessage(outcome: PermissionOutcome): {
+  title: string;
+  message: string;
+} {
+  if (outcome === 'blocked') {
+    return {
+      title: 'Microphone access blocked',
+      message:
+        'Trackr can’t record voice notes. Enable Microphone for Trackr in system Settings, then try again.',
+    };
+  }
+  return {
+    title: PermissionRationale.microphone.title,
+    message: PermissionRationale.microphone.message,
+  };
 }

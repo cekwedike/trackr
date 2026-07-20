@@ -21,7 +21,7 @@ import type { Attachment } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
 import { persistAudioRecording } from '@/lib/attachments';
 import { toUserMessage } from '@/lib/errors';
-import { PermissionRationale, requestMicrophone } from '@/lib/permissions';
+import { microphonePermissionMessage, requestMicrophone } from '@/lib/permissions';
 import { selectionFeedback } from '@/lib/haptics';
 
 const RECORD_OPTS = {
@@ -181,7 +181,10 @@ export function VoiceNoteSection({ noteId }: { noteId: number }) {
     try {
       const outcome = await requestMicrophone();
       if (outcome !== 'granted') {
-        Alert.alert(PermissionRationale.microphone.title, PermissionRationale.microphone.message);
+        if (outcome === 'blocked') {
+          const msg = microphonePermissionMessage(outcome);
+          Alert.alert(msg.title, msg.message);
+        }
         return;
       }
       await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });

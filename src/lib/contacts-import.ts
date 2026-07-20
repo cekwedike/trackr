@@ -39,8 +39,15 @@ function digits(phone: string | null | undefined): string {
   return (phone ?? '').replace(/\D/g, '');
 }
 
-export async function ensureContactsAccess(): Promise<PermissionOutcome> {
-  return requestContacts();
+/**
+ * JIT contacts access for import flows. Shows in-app rationale before the OS
+ * dialog (unless already granted / blocked). Always hits requestPermissionsAsync
+ * when the user can still be asked.
+ */
+export async function ensureContactsAccess(options?: {
+  withRationale?: boolean;
+}): Promise<PermissionOutcome> {
+  return requestContacts({ withRationale: options?.withRationale !== false });
 }
 
 export function contactsPermissionMessage(outcome: PermissionOutcome): { title: string; message: string } {
@@ -169,10 +176,8 @@ export async function importSelectedContacts(
   return { created, updated, skipped };
 }
 
-/** Native single-contact picker (privacy-friendly one-at-a-time). */
-export async function pickAndImportOneContact(): Promise<'cancelled' | 'created' | 'updated'> {
-  const picked = await Contact.presentPicker();
-  if (!picked) return 'cancelled';
+/** Map a native Contact into ImportableContact fields (no DB write). */
+async function detailsFromPicked(picked: Contact): Promise<ImportableContact> {
   const det = await picked.getDetails([
     ContactField.FULL_NAME,
     ContactField.GIVEN_NAME,
@@ -181,7 +186,7 @@ export async function pickAndImportOneContact(): Promise<'cancelled' | 'created'
     ContactField.EMAILS,
     ContactField.BIRTHDAY,
   ]);
-  const contact: ImportableContact = {
+  return {
     id: picked.id,
     name:
       det.fullName?.trim() ||
@@ -192,7 +197,32 @@ export async function pickAndImportOneContact(): Promise<'cancelled' | 'created'
     birthday: birthdayToIso(det.birthday ?? null),
     alreadyImported: !!(await findCustomerByContactId(picked.id)),
   };
-  const result = await importSelectedContacts([contact], 'import');
+}
+
+export type PickContactResult =
+  | { status: 'picked'; contact: ImportableContact }
+  | { status: 'cancelled' }
+  | { status: 'denied'; outcome: PermissionOutcome };
+
+/**
+ * Open the system contact picker after ensuring contacts access (rationale → OS dialog).
+ */
+export async function pickContactFields(): Promise<PickContactResult> {
+  const outcome = await ensureContactsAccess();
+  if (outcome !== 'granted') {
+    return { status: 'denied', outcome };
+  }
+  const picked = await Contact.presentPicker();
+  if (!picked) return { status: 'cancelled' };
+  return { status: 'picked', contact: await detailsFromPicked(picked) };
+}
+
+/** Native single-contact picker (privacy-friendly one-at-a-time) → create/update customer. */
+export async function pickAndImportOneContact(): Promise<'cancelled' | 'created' | 'updated' | 'denied'> {
+  const pick = await pickContactFields();
+  if (pick.status === 'denied') return 'denied';
+  if (pick.status === 'cancelled') return 'cancelled';
+  const result = await importSelectedContacts([pick.contact], 'import');
   if (result.created) return 'created';
   return 'updated';
 }

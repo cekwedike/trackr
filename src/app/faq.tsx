@@ -367,7 +367,7 @@ function buildFaqs(terms: IndustryTerms): FaqCategory[] {
         },
         {
           q: 'Where are Privacy and Terms?',
-          a: 'Open Settings → About, or More → Legal. The in-app Privacy Policy, Terms of Use, and Offline & Data notice are drafts for product use — have a lawyer review them before submitting Trackr to the App Store or Play Store.',
+          a: 'Open Settings → About, or More → Legal. You’ll find the Privacy Policy, Terms of Use, and Offline & Data notice there.',
         },
       ],
     },

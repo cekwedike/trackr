@@ -36,7 +36,7 @@ export function GettingStarted() {
     if (dismissed) return { dismissed: true as const, progress: null };
     const progress = await loadOnboardingProgress(industry, settings);
     return { dismissed: false as const, progress };
-  }, [industry.id, settings?.onboarded]);
+  }, [industry.id, settings?.onboarded, settings?.profit_allocation]);
 
   if (hidden || !data || data.dismissed || !data.progress) return null;
 

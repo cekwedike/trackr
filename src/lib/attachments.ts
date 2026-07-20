@@ -18,6 +18,9 @@
  */
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
+import { Alert, Linking } from 'react-native';
+
+import { photosPermissionMessage, confirmPermissionRationale } from '@/lib/permissions';
 
 const ATTACHMENTS_DIR = 'attachments';
 
@@ -63,21 +66,37 @@ function extensionFor(source: File, mime: string | null, fallback = '.bin'): str
 }
 
 /**
- * Request photo-library permission, launch the library picker and copy the
- * chosen image into the persistent `attachments/` directory.
+ * Request photo-library permission (with in-app rationale), launch the library
+ * picker and copy the chosen image into the persistent `attachments/` directory.
  *
- * Returns the persisted `{ uri, mime }`, or `null` when permission is denied or
- * the user cancels.
+ * Returns the persisted `{ uri, mime }`, or `null` when the user cancels / declines.
+ * On modern Android the system photo picker often needs no runtime permission —
+ * after the rationale we still open the picker even if classic media access is denied.
  */
 export async function pickAttachmentImage(): Promise<PickedAttachment | null> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) return null;
+  const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
+  if (!existing.granted) {
+    if (existing.canAskAgain) {
+      const ok = await confirmPermissionRationale('photos');
+      if (!ok) return null;
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    }
+  }
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     quality: 0.7,
   });
-  if (result.canceled || !result.assets?.length) return null;
+  if (result.canceled || !result.assets?.length) {
+    if (!existing.granted && !existing.canAskAgain) {
+      const msg = photosPermissionMessage('blocked');
+      Alert.alert(msg.title, msg.message, [
+        { text: 'Open Settings', onPress: () => Linking.openSettings().catch(() => {}) },
+        { text: 'OK', style: 'cancel' },
+      ]);
+    }
+    return null;
+  }
 
   const asset = result.assets[0];
   const mime = asset.mimeType ?? null;
