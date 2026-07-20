@@ -1,11 +1,12 @@
 /**
- * Full backup / restore with optional media (LOCKED: zip includes audio).
+ * Full backup / restore with optional media and passphrase encryption.
  *
  * Format v2: a `.zip` containing:
  *   - `backup.json` — same table dump as the legacy JSON backup
  *   - `attachments/<filename>` — binary files referenced by the attachments table
  *
- * Legacy `.json` backups (version 1) still restore; they simply have no media files.
+ * Format v3 (encrypted): AES-GCM wrapped zip (`TRKRBK01` magic) — see backup-crypto.ts.
+ * Legacy plaintext `.zip` / `.json` backups still restore, with a warning from the UI.
  */
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
@@ -15,6 +16,7 @@ import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { getDb } from '@/db/client';
 import { listAllAttachments } from '@/db/repos/attachments';
 import { attachmentFileName, writeAttachmentBytes } from '@/lib/attachments';
+import { decryptBackupBytes, encryptBackupBytes, isEncryptedBackup } from '@/lib/backup-crypto';
 import { dayjs } from '@/lib/date';
 
 const TABLES = [
@@ -48,6 +50,8 @@ export interface BackupPayload {
   exportedAt: string;
   data: Record<string, Record<string, unknown>[]>;
 }
+
+export type BackupKind = 'encrypted' | 'legacy-zip' | 'legacy-json';
 
 export async function buildBackup(): Promise<BackupPayload> {
   const db = await getDb();
@@ -102,8 +106,7 @@ async function collectAttachmentFiles(): Promise<{
   return { files, uriToEntry };
 }
 
-/** Export all data + attachment media to a zip and open the share sheet. */
-export async function exportBackup(): Promise<string> {
+async function buildZipBytes(): Promise<Uint8Array> {
   const payload = await buildBackup();
   const { files, uriToEntry } = await collectAttachmentFiles();
   const remapped = remapAttachmentUris(payload, uriToEntry);
@@ -113,17 +116,32 @@ export async function exportBackup(): Promise<string> {
     'backup.json': strToU8(json),
     ...files,
   };
-  const zipped = zipSync(zipEntries, { level: 6 });
+  return zipSync(zipEntries, { level: 6 });
+}
 
-  const filename = `trackr-backup-${dayjs().format('YYYY-MM-DD-HHmm')}.zip`;
+/**
+ * Export all data + attachment media as a passphrase-encrypted backup and share it.
+ * The share file is a `.trackrbackup` container (encrypted zip).
+ */
+export async function exportBackup(passphrase: string): Promise<string> {
+  const zipped = await buildZipBytes();
+  let encrypted: Uint8Array;
+  try {
+    encrypted = await encryptBackupBytes(zipped, passphrase);
+  } catch (e) {
+    if (e instanceof Error && e.message.length < 120) throw e;
+    throw new Error('Couldn’t encrypt your backup. Please try a different passphrase.');
+  }
+
+  const filename = `trackr-backup-${dayjs().format('YYYY-MM-DD-HHmm')}.trackrbackup`;
   const out = new File(Paths.cache, filename);
   if (out.exists) out.delete();
   out.create();
-  out.write(zipped);
+  out.write(encrypted);
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(out.uri, {
-      mimeType: 'application/zip',
+      mimeType: 'application/octet-stream',
       dialogTitle: 'Export Trackr backup',
     });
   }
@@ -185,42 +203,109 @@ async function materializeAttachmentFiles(
   }
 }
 
-/** Let the user pick a backup (.zip or legacy .json) and restore it. */
-export async function importBackup(): Promise<{ imported: boolean; tables: number }> {
+async function restoreFromZipBytes(bytes: Uint8Array): Promise<number> {
+  const entries = unzipSync(bytes);
+  const jsonBytes = entries['backup.json'];
+  if (!jsonBytes) throw new Error('This zip is not a valid Trackr backup (missing backup.json).');
+  const payload = JSON.parse(strFromU8(jsonBytes)) as BackupPayload;
+  const tables = await restorePayload(payload);
+  const media: Record<string, Uint8Array> = {};
+  for (const [path, data] of Object.entries(entries)) {
+    if (path.startsWith('attachments/') && !path.endsWith('/')) {
+      media[path] = data;
+    }
+  }
+  await materializeAttachmentFiles(media);
+  return tables;
+}
+
+/**
+ * Pick a backup file and inspect whether it needs a passphrase.
+ * Does not restore — caller confirms, then calls {@link importBackupWithPassphrase} or
+ * {@link importLegacyBackup}.
+ */
+export async function pickBackupFile(): Promise<
+  | { picked: false }
+  | { picked: true; uri: string; name: string; kind: BackupKind; bytes: Uint8Array }
+> {
   const picked = await DocumentPicker.getDocumentAsync({
-    type: ['application/zip', 'application/json', 'text/plain', '*/*'],
+    type: ['application/zip', 'application/json', 'application/octet-stream', 'text/plain', '*/*'],
     copyToCacheDirectory: true,
   });
-  if (picked.canceled || !picked.assets?.length) return { imported: false, tables: 0 };
+  if (picked.canceled || !picked.assets?.length) return { picked: false };
 
   const asset = picked.assets[0];
   const file = new File(asset.uri);
   const name = (asset.name ?? asset.uri).toLowerCase();
-  const isZip = name.endsWith('.zip') || asset.mimeType === 'application/zip';
+  const bytes = await file.bytes();
+
+  if (isEncryptedBackup(bytes) || name.endsWith('.trackrbackup')) {
+    return { picked: true, uri: asset.uri, name: asset.name ?? 'backup', kind: 'encrypted', bytes };
+  }
+
+  const isZip =
+    name.endsWith('.zip') ||
+    asset.mimeType === 'application/zip' ||
+    (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b);
 
   if (isZip) {
-    const bytes = await file.bytes();
-    const entries = unzipSync(bytes);
-    const jsonBytes = entries['backup.json'];
-    if (!jsonBytes) throw new Error('This zip is not a valid Trackr backup (missing backup.json).');
-    const payload = JSON.parse(strFromU8(jsonBytes)) as BackupPayload;
-    const tables = await restorePayload(payload);
-    const media: Record<string, Uint8Array> = {};
-    for (const [path, data] of Object.entries(entries)) {
-      if (path.startsWith('attachments/') && !path.endsWith('/')) {
-        media[path] = data;
-      }
-    }
-    await materializeAttachmentFiles(media);
+    return { picked: true, uri: asset.uri, name: asset.name ?? 'backup', kind: 'legacy-zip', bytes };
+  }
+
+  return { picked: true, uri: asset.uri, name: asset.name ?? 'backup', kind: 'legacy-json', bytes };
+}
+
+/** Restore a passphrase-encrypted `.trackrbackup` (or encrypted bytes). */
+export async function importBackupWithPassphrase(
+  bytes: Uint8Array,
+  passphrase: string,
+): Promise<{ imported: true; tables: number }> {
+  let zipBytes: Uint8Array;
+  try {
+    zipBytes = await decryptBackupBytes(bytes, passphrase);
+  } catch (e) {
+    if (e instanceof Error && e.message.length < 160) throw e;
+    throw new Error('Couldn’t unlock that backup. Check the passphrase and try again.');
+  }
+  try {
+    const tables = await restoreFromZipBytes(zipBytes);
+    await rescheduleBirthdaysAfterRestore();
+    return { imported: true, tables };
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('valid Trackr')) throw e;
+    throw new Error('Couldn’t restore that backup. The file may be damaged.');
+  }
+}
+
+/** Restore a legacy plaintext zip or JSON backup. */
+export async function importLegacyBackup(
+  bytes: Uint8Array,
+  kind: 'legacy-zip' | 'legacy-json',
+): Promise<{ imported: true; tables: number }> {
+  if (kind === 'legacy-zip') {
+    const tables = await restoreFromZipBytes(bytes);
     await rescheduleBirthdaysAfterRestore();
     return { imported: true, tables };
   }
-
-  const raw = await file.text();
+  const raw = new TextDecoder().decode(bytes);
   const payload = JSON.parse(raw) as BackupPayload;
   const tables = await restorePayload(payload);
   await rescheduleBirthdaysAfterRestore();
   return { imported: true, tables };
+}
+
+/**
+ * @deprecated Prefer pickBackupFile + importBackupWithPassphrase / importLegacyBackup
+ * so the UI can collect a passphrase and warn about legacy files.
+ */
+export async function importBackup(): Promise<{ imported: boolean; tables: number }> {
+  const picked = await pickBackupFile();
+  if (!picked.picked) return { imported: false, tables: 0 };
+  if (picked.kind === 'encrypted') {
+    throw new Error('This backup is passphrase-protected. Enter the passphrase to restore.');
+  }
+  const result = await importLegacyBackup(picked.bytes, picked.kind);
+  return result;
 }
 
 async function rescheduleBirthdaysAfterRestore(): Promise<void> {

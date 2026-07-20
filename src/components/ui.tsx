@@ -420,6 +420,8 @@ export function TextField({
   right,
   secureTextEntry,
   maxLength,
+  autoCapitalize,
+  autoCorrect,
 }: {
   label?: string;
   value: string;
@@ -433,6 +435,8 @@ export function TextField({
   right?: React.ReactNode;
   secureTextEntry?: boolean;
   maxLength?: number;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoCorrect?: boolean;
 }) {
   const t = useTheme();
   const [focused, setFocused] = useState(false);
@@ -462,6 +466,8 @@ export function TextField({
           autoFocus={autoFocus}
           secureTextEntry={secureTextEntry}
           maxLength={maxLength}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{

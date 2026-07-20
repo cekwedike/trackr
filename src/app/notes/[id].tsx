@@ -7,7 +7,7 @@ import { useConfirm } from '@/components/confirm';
 import { useUndo } from '@/components/undo';
 import { ChecklistEditor } from '@/components/notes/checklist-editor';
 import { ColorPicker } from '@/components/notes/color-picker';
-import { ENTITY_ROUTE, entityMeta } from '@/components/notes/entities';
+import { ENTITY_ROUTE, entityMeta, linkDisplayTitle } from '@/components/notes/entities';
 import { NoteTypePicker, NOTE_TYPE_META } from '@/components/notes/note-type-picker';
 import { useNoteColorTokens } from '@/components/notes/palette';
 import { VoiceNoteSection } from '@/components/notes/voice-recorder';
@@ -145,7 +145,7 @@ export default function NoteEditor() {
     } else if (linkType === 'order') {
       options = (await listOrders()).map((o) => ({
         id: String(o.id),
-        label: o.customer_name || `Order #${o.id}`,
+        label: o.customer_name || 'Order',
       }));
     }
     setEntityOptions(options);
@@ -280,7 +280,7 @@ export default function NoteEditor() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text variant="body" weight="semibold" numberOfLines={1}>
-                      {l.target_title}
+                      {linkDisplayTitle(l.target_title, l.target_type)}
                     </Text>
                     <Text variant="caption" color={t.textSecondary}>
                       {meta.label}

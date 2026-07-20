@@ -40,8 +40,8 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
   {
     heading: 'Backups you create',
     body: [
-      'Exporting a backup creates a file you can save wherever you choose (device storage, email, or a cloud drive you control). That file may include business records and, when voice notes ship, audio attachments.',
-      'We do not receive your backup unless you deliberately send it to us (for example for support). You are responsible for where you store backups and who can access them.',
+      'Exporting a backup creates a file you can save wherever you choose (device storage, email, or a cloud drive you control). New backups are encrypted with a passphrase you choose; older unprotected zip/JSON backups may still exist if you exported them before encryption shipped.',
+      'That file may include business records and, when voice notes ship, audio attachments. We do not receive your backup unless you deliberately send it to us (for example for support). You are responsible for where you store backups, who can access them, and for keeping your passphrase safe — Trackr cannot recover a forgotten backup passphrase.',
     ],
   },
   {
@@ -97,7 +97,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
     heading: 'Your data and backups',
     body: [
       'You own the business content you enter. It is stored on your device unless you export it.',
-      'You are responsible for exporting backups regularly and storing them safely. Uninstalling the App, device failure, or clearing storage may permanently delete local data. We are not liable for loss of data you did not back up.',
+      'You are responsible for exporting backups regularly, choosing a strong passphrase for encrypted backups, and storing those files safely. Uninstalling the App, device failure, or clearing storage may permanently delete local data. We are not liable for loss of data you did not back up, or for backups you cannot unlock because the passphrase was lost.',
     ],
   },
   {
@@ -151,8 +151,8 @@ export const OFFLINE_SECTIONS: LegalSection[] = [
   {
     heading: 'Backups are your responsibility',
     body: [
-      'Use Export backup from Settings or Data & backup to save a file you control. Store it somewhere safe. Restore only when you intend to replace the current on-device data with that file.',
-      'When voice notes are available, backups may include audio under attachments — treat backup files as sensitive.',
+      'Use Export backup from Settings or Data & backup to save a passphrase-protected file you control. Store it somewhere safe and remember the passphrase — it is required to restore encrypted backups. Restore only when you intend to replace the current on-device data with that file.',
+      'Older unprotected zip/JSON backups can still be restored, but treat them as sensitive: anyone with the file can read your books. When voice notes are available, backups may include audio under attachments.',
     ],
   },
   {

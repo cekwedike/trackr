@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ScreenCapture from 'expo-screen-capture';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Aurora, PressableScale } from '@/components/anim';
@@ -9,7 +10,13 @@ import { Spring } from '@/constants/motion';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
-import { authenticateBiometric, isBiometricAvailable, verifyPin } from '@/lib/auth';
+import {
+  authenticateBiometric,
+  formatLockoutDuration,
+  getPinLockoutRemainingMs,
+  isBiometricAvailable,
+  verifyPin,
+} from '@/lib/auth';
 import { successFeedback, tapFeedback, warningFeedback } from '@/lib/haptics';
 
 export default function Lock() {
@@ -17,11 +24,26 @@ export default function Lock() {
   const { settings, unlock } = useApp();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [lockoutMs, setLockoutMs] = useState(0);
   const [biometricReady, setBiometricReady] = useState(false);
   const autoPrompted = useRef(false);
   const shake = useSharedValue(0);
 
   const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.value }] }));
+
+  // Block screenshots / obscure app switcher while the lock gate is visible.
+  useEffect(() => {
+    ScreenCapture.preventScreenCaptureAsync('lock').catch(() => {});
+    if (Platform.OS === 'ios') {
+      ScreenCapture.enableAppSwitcherProtectionAsync(0.8).catch(() => {});
+    }
+    return () => {
+      ScreenCapture.allowScreenCaptureAsync('lock').catch(() => {});
+      if (Platform.OS === 'ios') {
+        ScreenCapture.disableAppSwitcherProtectionAsync().catch(() => {});
+      }
+    };
+  }, []);
 
   // Only offer biometrics when the user opted in AND the device can actually
   // do it (hardware present + a fingerprint/face enrolled).
@@ -29,8 +51,6 @@ export default function Lock() {
 
   useEffect(() => {
     let active = true;
-    // Resolve readiness asynchronously so we never call setState synchronously
-    // in the effect body. Readiness = opted in AND device supports/enrolled.
     Promise.resolve(biometricEnabled ? isBiometricAvailable() : false).then((ok) => {
       if (active) setBiometricReady(ok);
     });
@@ -39,50 +59,75 @@ export default function Lock() {
     };
   }, [biometricEnabled]);
 
+  // Poll remaining lockout so the pad re-enables when the timer expires.
+  useEffect(() => {
+    let active = true;
+    const tick = async () => {
+      const ms = await getPinLockoutRemainingMs();
+      if (active) setLockoutMs(ms);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, []);
+
   const tryBiometric = useCallback(async () => {
-    if (!biometricEnabled || !biometricReady) return;
+    if (!biometricEnabled || !biometricReady || lockoutMs > 0) return;
     const ok = await authenticateBiometric(`Unlock ${settings?.business_name ?? 'Trackr'}`);
     // On failure or cancel we stay locked and the PIN pad remains available.
     if (ok) {
       successFeedback();
       unlock();
     }
-  }, [biometricEnabled, biometricReady, settings?.business_name, unlock]);
+  }, [biometricEnabled, biometricReady, lockoutMs, settings?.business_name, unlock]);
 
   useEffect(() => {
     // Auto-prompt exactly once, as soon as biometrics are confirmed available.
-    if (biometricReady && !autoPrompted.current) {
+    if (biometricReady && !autoPrompted.current && lockoutMs === 0) {
       autoPrompted.current = true;
       tryBiometric();
     }
-  }, [biometricReady, tryBiometric]);
+  }, [biometricReady, lockoutMs, tryBiometric]);
+
+  const failVisual = useCallback(() => {
+    setError(true);
+    warningFeedback();
+    shake.value = withSequence(
+      withTiming(-10, { duration: 50 }),
+      withTiming(10, { duration: 50 }),
+      withTiming(-7, { duration: 50 }),
+      withTiming(7, { duration: 50 }),
+      withSpring(0, Spring.snappy),
+    );
+    setTimeout(() => {
+      setPin('');
+      setError(false);
+    }, 500);
+  }, [shake]);
 
   const attempt = useCallback(
     async (candidate: string) => {
-      const ok = await verifyPin(candidate);
-      if (ok) {
+      if (lockoutMs > 0) return;
+      const result = await verifyPin(candidate);
+      if (result === 'ok') {
         successFeedback();
         unlock();
-      } else if (candidate.length >= 6) {
-        setError(true);
-        warningFeedback();
-        shake.value = withSequence(
-          withTiming(-10, { duration: 50 }),
-          withTiming(10, { duration: 50 }),
-          withTiming(-7, { duration: 50 }),
-          withTiming(7, { duration: 50 }),
-          withSpring(0, Spring.snappy),
-        );
-        setTimeout(() => {
-          setPin('');
-          setError(false);
-        }, 500);
+        return;
+      }
+      if (result === 'locked' || candidate.length >= 6) {
+        const ms = await getPinLockoutRemainingMs();
+        setLockoutMs(ms);
+        failVisual();
       }
     },
-    [unlock, shake],
+    [unlock, failVisual, lockoutMs],
   );
 
   const press = (digit: string) => {
+    if (lockoutMs > 0) return;
     setError(false);
     tapFeedback();
     const next = (pin + digit).slice(0, 6);
@@ -91,12 +136,14 @@ export default function Lock() {
   };
 
   const backspace = () => {
+    if (lockoutMs > 0) return;
     setError(false);
     tapFeedback();
     setPin((p) => p.slice(0, -1));
   };
 
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  const lockedOut = lockoutMs > 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: t.background, justifyContent: 'center', padding: Spacing.xl }}>
@@ -104,7 +151,11 @@ export default function Lock() {
       <View style={{ alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.xxl }}>
         <Brand size={64} />
         <Text variant="title">{settings?.business_name ?? 'Trackr'}</Text>
-        <Text variant="body" color={t.textSecondary}>Enter your PIN to unlock</Text>
+        <Text variant="body" color={t.textSecondary}>
+          {lockedOut
+            ? `Too many attempts — try again in ${formatLockoutDuration(lockoutMs)}`
+            : 'Enter your PIN to unlock'}
+        </Text>
       </View>
 
       <Animated.View style={[{ flexDirection: 'row', justifyContent: 'center', gap: Spacing.md, marginBottom: Spacing.xxl }, shakeStyle]}>
@@ -113,11 +164,11 @@ export default function Lock() {
         ))}
       </Animated.View>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.lg, maxWidth: 300, alignSelf: 'center' }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.lg, maxWidth: 300, alignSelf: 'center', opacity: lockedOut ? 0.45 : 1 }}>
         {keys.map((k) => (
           <PadButton key={k} label={k} onPress={() => press(k)} />
         ))}
-        {biometricReady ? (
+        {biometricReady && !lockedOut ? (
           <PadButton icon="finger-print" onPress={tryBiometric} />
         ) : (
           <View style={{ width: 76, height: 76 }} />
@@ -126,7 +177,7 @@ export default function Lock() {
         <PadButton icon="backspace-outline" onPress={backspace} />
       </View>
 
-      {biometricReady ? (
+      {biometricReady && !lockedOut ? (
         <PressableScale onPress={tryBiometric} hitSlop={8} style={{ alignSelf: 'center', marginTop: Spacing.xl }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
             <Ionicons name="finger-print" size={18} color={t.primary} />

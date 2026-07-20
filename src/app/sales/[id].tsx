@@ -122,7 +122,7 @@ export default function SaleDetail() {
 
   return (
     <Screen>
-      <AppHeader title={`${terms.sale} #${sale.id}`} back right={<IconButton icon="trash-outline" tone="danger" onPress={remove} />} />
+      <AppHeader title={customer?.name || terms.sale} back right={<IconButton icon="trash-outline" tone="danger" onPress={remove} />} />
 
       <DetailHero
         label="Total sale"

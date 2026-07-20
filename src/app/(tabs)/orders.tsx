@@ -55,7 +55,7 @@ export default function OrdersScreen() {
                 <ListRow
                   icon="clipboard"
                   iconTone={STATUS_TONE[o.status]}
-                  title={o.customer_name || `${terms.order} #${o.id}`}
+                  title={o.customer_name || terms.order}
                   subtitle={`${money(o.total)}${balance > 0 ? ` · ${money(balance)} due` : ' · paid'}${o.due_at ? ` · due ${formatDate(o.due_at)}` : ''}`}
                   onPress={() => router.push(`/orders/${o.id}`)}
                   right={<Chip label={STATUS_LABEL[o.status]} tone={STATUS_TONE[o.status]} />}

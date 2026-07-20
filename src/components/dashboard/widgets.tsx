@@ -346,7 +346,7 @@ function OrdersPipeline({ data }: WidgetProps) {
         active.slice(0, 4).map((o) => (
           <ListRow
             key={o.id}
-            title={o.customer_name || `${terms.order} #${o.id}`}
+            title={o.customer_name || terms.order}
             subtitle={o.due_at ? `Due ${fromNow(o.due_at)}` : ORDER_STATUSES.find((s) => s.value === o.status)?.label}
             right={<Text variant="body" weight="semibold" color={orderBalance(o.total, o.amount_paid) > 0 ? t.warning : t.success}>{money(orderBalance(o.total, o.amount_paid))}</Text>}
             onPress={() => router.push(`/orders/${o.id}` as Href)}
@@ -376,7 +376,7 @@ function AppointmentsToday({ data }: WidgetProps) {
           <ListRow
             key={o.id}
             icon="time-outline"
-            title={o.customer_name || `${terms.order} #${o.id}`}
+            title={o.customer_name || terms.order}
             subtitle={formatDate(o.due_at)}
             right={<Text variant="caption" color={t.textSecondary}>{fromNow(o.due_at)}</Text>}
             onPress={() => router.push(`/orders/${o.id}` as Href)}

@@ -1,6 +1,6 @@
 /**
  * Map thrown / unknown errors to short, user-facing sentences.
- * Never surface stacks, SQLite internals, or HTTP status dumps.
+ * Never surface stacks, SQLite internals, HTTP status dumps, or opaque ids.
  */
 export function toUserMessage(
   error: unknown,
@@ -38,8 +38,15 @@ export function toUserMessage(
     return 'Couldn’t read your books. Try again. If it keeps happening, export a backup from Data.';
   }
 
-  // Never dump stacks, paths, or long technical blobs
-  if (raw.length > 160 || raw.includes('\n') || /^\s*Error:/i.test(raw)) {
+  // Never dump stacks, paths, long technical blobs, or opaque ids (UUID / hex / "id: …")
+  if (
+    raw.length > 160 ||
+    raw.includes('\n') ||
+    /^\s*Error:/i.test(raw) ||
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(raw) ||
+    /\b[0-9a-f]{24,}\b/i.test(raw) ||
+    /\b(id|uuid|entity[_ ]?id)\s*[:=#]\s*\S+/i.test(raw)
+  ) {
     return fallback;
   }
 

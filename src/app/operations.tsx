@@ -114,7 +114,7 @@ export default function OperationsScreen() {
                   <ListRow
                     icon="clipboard"
                     iconTone="warning"
-                    title={o.customer_name || `${terms.order} #${o.id}`}
+                    title={o.customer_name || terms.order}
                     subtitle={`${money(o.total)}${o.due_at ? ` · due ${formatDate(o.due_at)}` : ''}`}
                     onPress={() => router.push(`/orders/${o.id}`)}
                     right={<Chip label={status} tone="warning" />}
@@ -157,7 +157,7 @@ export default function OperationsScreen() {
                 <ListRow
                   icon="calendar"
                   iconTone={overdue ? 'danger' : 'primary'}
-                  title={o.customer_name || `${terms.order} #${o.id}`}
+                  title={o.customer_name || terms.order}
                   subtitle={formatDate(o.due_at)}
                   onPress={() => router.push(`/orders/${o.id}`)}
                   right={

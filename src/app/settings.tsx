@@ -6,6 +6,7 @@ import { Alert, Modal, Pressable, View } from 'react-native';
 
 import { FadeSlide } from '@/components/anim';
 import { useConfirm } from '@/components/confirm';
+import { PassphraseModal } from '@/components/passphrase-modal';
 import { AppHeader, Button, Card, Divider, ListRow, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { SelectField, SelectModal } from '@/components/pickers';
 import { CURRENCIES, findCurrency } from '@/constants/currencies';
@@ -14,8 +15,21 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { updateSettings } from '@/db/repos/settings';
 import { useTheme } from '@/hooks/use-theme';
-import { clearPin, isBiometricAvailable, setPin } from '@/lib/auth';
-import { exportBackup, importBackup } from '@/lib/backup';
+import {
+  authenticateBiometric,
+  clearPin,
+  formatLockoutDuration,
+  getPinLockoutRemainingMs,
+  isBiometricAvailable,
+  setPin,
+  verifyPin,
+} from '@/lib/auth';
+import {
+  exportBackup,
+  importBackupWithPassphrase,
+  importLegacyBackup,
+  pickBackupFile,
+} from '@/lib/backup';
 import { dayjs } from '@/lib/date';
 import { toUserMessage } from '@/lib/errors';
 import { cancelDailyNudge, cancelWeeklyNudge, scheduleDailyNudge, scheduleWeeklyNudge } from '@/lib/notifications';
@@ -59,6 +73,13 @@ export default function Settings() {
   const [currencyModal, setCurrencyModal] = useState(false);
   const [industryModal, setIndustryModal] = useState(false);
   const [pinModal, setPinModal] = useState(false);
+  const [verifyPinModal, setVerifyPinModal] = useState<'disable' | 'change' | null>(null);
+  const [exportPassModal, setExportPassModal] = useState(false);
+  const [importPassModal, setImportPassModal] = useState(false);
+  const [pendingImport, setPendingImport] = useState<{
+    bytes: Uint8Array;
+    kind: 'encrypted' | 'legacy-zip' | 'legacy-json';
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [dailyNudge, setDailyNudge] = useState(false);
@@ -145,24 +166,49 @@ export default function Settings() {
     }, 220);
   };
 
+  /** Prefer biometric, otherwise current PIN, before disabling lock or changing PIN. */
+  const requireLockAuth = async (purpose: 'disable' | 'change'): Promise<boolean> => {
+    if (settings.biometric_enabled === 1 && biometricAvailable) {
+      const ok = await authenticateBiometric(
+        purpose === 'disable' ? 'Confirm to turn off app lock' : 'Confirm to change your PIN',
+      );
+      if (ok) return true;
+    }
+    setVerifyPinModal(purpose);
+    return false;
+  };
+
+  const finishDisableLock = async () => {
+    await clearPin();
+    await updateSettings({ lock_enabled: 0, biometric_enabled: 0 });
+    await reloadSettings();
+  };
+
   const toggleLock = async () => {
     if (settings.lock_enabled === 1) {
       const choice = await confirm({
-        title: 'Turn off app lock',
-        message: 'Trackr will open without a PIN. Continue?',
+        title: 'Turn off app lock?',
+        message:
+          'Trackr will open without a PIN. App lock slows casual access — it does not encrypt your books on disk. Continue?',
         actions: [
           { label: 'Turn off', style: 'destructive', value: 'off' },
           { label: 'Cancel', style: 'cancel', value: 'cancel' },
         ],
       });
-      if (choice === 'off') {
-        await clearPin();
-        await updateSettings({ lock_enabled: 0, biometric_enabled: 0 });
-        await reloadSettings();
-      }
+      if (choice !== 'off') return;
+      const authed = await requireLockAuth('disable');
+      if (authed) await finishDisableLock();
     } else {
       setPinModal(true);
     }
+  };
+
+  const onVerifiedPin = async (ok: boolean) => {
+    const purpose = verifyPinModal;
+    setVerifyPinModal(null);
+    if (!ok || !purpose) return;
+    if (purpose === 'disable') await finishDisableLock();
+    else setPinModal(true);
   };
 
   const savePin = async (pin: string) => {
@@ -170,6 +216,15 @@ export default function Settings() {
     await updateSettings({ lock_enabled: 1 });
     await reloadSettings();
     setPinModal(false);
+  };
+
+  const requestChangePin = async () => {
+    if (settings.lock_enabled !== 1) {
+      setPinModal(true);
+      return;
+    }
+    const authed = await requireLockAuth('change');
+    if (authed) setPinModal(true);
   };
 
   const toggleBiometric = async () => {
@@ -251,10 +306,13 @@ export default function Settings() {
     }
   };
 
-  const doExport = async () => {
+  const doExport = () => setExportPassModal(true);
+
+  const runExport = async (passphrase: string) => {
+    setExportPassModal(false);
     setBusy(true);
     try {
-      await exportBackup();
+      await exportBackup(passphrase);
     } catch (e) {
       Alert.alert('Export failed', toUserMessage(e, 'Couldn’t export your backup. Please try again.'));
     } finally {
@@ -272,13 +330,51 @@ export default function Settings() {
       ],
     });
     if (choice !== 'restore') return;
+
     setBusy(true);
     try {
-      const res = await importBackup();
-      if (res.imported) {
-        await reloadSettings();
-        Alert.alert('Restored', 'Your data has been restored.');
+      const picked = await pickBackupFile();
+      if (!picked.picked) return;
+
+      if (picked.kind === 'encrypted') {
+        setPendingImport({ bytes: picked.bytes, kind: 'encrypted' });
+        setImportPassModal(true);
+        return;
       }
+
+      const legacy = await confirm({
+        title: 'Unencrypted backup',
+        message:
+          'This older backup is not passphrase-protected. Anyone with the file can read your books. Restore it anyway?',
+        actions: [
+          { label: 'Restore anyway', style: 'destructive', value: 'ok' },
+          { label: 'Cancel', style: 'cancel', value: 'cancel' },
+        ],
+      });
+      if (legacy !== 'ok') return;
+
+      await importLegacyBackup(picked.bytes, picked.kind);
+      await reloadSettings();
+      Alert.alert('Restored', 'Your data has been restored.');
+    } catch (e) {
+      Alert.alert('Import failed', toUserMessage(e, 'Couldn’t restore that backup. Please try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runEncryptedImport = async (passphrase: string) => {
+    if (!pendingImport || pendingImport.kind !== 'encrypted') {
+      setImportPassModal(false);
+      return;
+    }
+    setImportPassModal(false);
+    setBusy(true);
+    try {
+      await importBackupWithPassphrase(pendingImport.bytes, passphrase);
+      setPendingImport(null);
+      await reloadSettings();
+      Alert.alert('Restored', 'Your data has been restored.');
     } catch (e) {
       Alert.alert('Import failed', toUserMessage(e, 'Couldn’t restore that backup. Please try again.'));
     } finally {
@@ -300,9 +396,9 @@ export default function Settings() {
       </FadeSlide>
 
       <FadeSlide delay={80}>
-        <SectionHeader title="Security" />
+        <SectionHeader title="Security" subtitle="App lock is a gate — not full encryption of your books" />
         <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
-          <ToggleRow icon="lock-closed" label="App lock (PIN)" value={settings.lock_enabled === 1} onToggle={toggleLock} />
+          <ToggleRow icon="lock-closed" label="App lock (PIN)" value={settings.lock_enabled === 1} onToggle={toggleLock} hint="Asks for PIN or biometrics after you leave the app" />
           {settings.lock_enabled === 1 ? (
             <>
               <Divider />
@@ -315,7 +411,7 @@ export default function Settings() {
                 hint={!biometricAvailable ? 'No fingerprint or face unlock is set up on this device' : undefined}
               />
               <Divider />
-              <ListRow icon="key" iconTone="primary" title="Change PIN" onPress={() => setPinModal(true)} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+              <ListRow icon="key" iconTone="primary" title="Change PIN" onPress={requestChangePin} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
             </>
           ) : null}
         </Card>
@@ -402,9 +498,23 @@ export default function Settings() {
       <FadeSlide delay={180}>
         <SectionHeader title="Data" />
         <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
-          <ListRow icon="cloud-upload" iconTone="success" title="Export backup" subtitle="Zip with data + voice/media files" onPress={doExport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+          <ListRow
+            icon="cloud-upload"
+            iconTone="success"
+            title="Export backup"
+            subtitle={busy ? 'Preparing encrypted backup…' : 'Passphrase-protected zip of data + media'}
+            onPress={doExport}
+            right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />}
+          />
           <Divider />
-          <ListRow icon="cloud-download" iconTone="warning" title="Restore backup" subtitle="Replace data from a zip or JSON file" onPress={doImport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+          <ListRow
+            icon="cloud-download"
+            iconTone="warning"
+            title="Restore backup"
+            subtitle="Encrypted, or older unprotected zip/JSON"
+            onPress={doImport}
+            right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />}
+          />
         </Card>
       </FadeSlide>
 
@@ -436,7 +546,33 @@ export default function Settings() {
         options={TIME_OPTIONS.map((o) => ({ id: o.id, label: o.label }))}
       />
       <PinModal visible={pinModal} onClose={() => setPinModal(false)} onSave={savePin} />
-      {busy ? <View style={{ position: 'absolute' }} /> : null}
+      <VerifyPinModal
+        visible={verifyPinModal != null}
+        title={verifyPinModal === 'disable' ? 'Enter PIN to turn off lock' : 'Enter current PIN'}
+        onClose={() => setVerifyPinModal(null)}
+        onResult={onVerifiedPin}
+      />
+      <PassphraseModal
+        visible={exportPassModal}
+        mode="export"
+        title="Protect this backup"
+        message="Choose a passphrase. You’ll need it to restore. Don’t share the file without it."
+        confirmLabel="Export"
+        onClose={() => setExportPassModal(false)}
+        onSubmit={runExport}
+      />
+      <PassphraseModal
+        visible={importPassModal}
+        mode="import"
+        title="Enter backup passphrase"
+        message="This backup is encrypted. Enter the passphrase used when it was exported."
+        confirmLabel="Restore"
+        onClose={() => {
+          setImportPassModal(false);
+          setPendingImport(null);
+        }}
+        onSubmit={runEncryptedImport}
+      />
     </Screen>
   );
 }
@@ -474,20 +610,20 @@ function ToggleRow({
 function PinModal({ visible, onClose, onSave }: { visible: boolean; onClose: () => void; onSave: (pin: string) => void }) {
   const t = useTheme();
   const [pin, setPinValue] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (visible) {
       setPinValue('');
-      setConfirm('');
+      setConfirmPin('');
       setError('');
     }
   }, [visible]);
 
   const submit = () => {
     if (pin.length < 4) return setError('PIN must be at least 4 digits.');
-    if (pin !== confirm) return setError('PINs do not match.');
+    if (pin !== confirmPin) return setError('PINs do not match.');
     onSave(pin);
   };
 
@@ -497,11 +633,80 @@ function PinModal({ visible, onClose, onSave }: { visible: boolean; onClose: () 
         <View style={{ backgroundColor: t.background, borderRadius: Radius.xl, padding: Spacing.lg, gap: Spacing.md }}>
           <Text variant="subtitle">Set PIN</Text>
           <TextField label="New PIN" value={pin} onChangeText={setPinValue} keyboardType="number-pad" secureTextEntry maxLength={6} />
-          <TextField label="Confirm PIN" value={confirm} onChangeText={setConfirm} keyboardType="number-pad" secureTextEntry maxLength={6} />
+          <TextField label="Confirm PIN" value={confirmPin} onChangeText={setConfirmPin} keyboardType="number-pad" secureTextEntry maxLength={6} />
           {error ? <Text variant="caption" color={t.danger}>{error}</Text> : null}
           <View style={{ flexDirection: 'row', gap: Spacing.md }}>
             <Button title="Cancel" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
             <Button title="Save" onPress={submit} style={{ flex: 1 }} />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function VerifyPinModal({
+  visible,
+  title,
+  onClose,
+  onResult,
+}: {
+  visible: boolean;
+  title: string;
+  onClose: () => void;
+  onResult: (ok: boolean) => void;
+}) {
+  const t = useTheme();
+  const [pin, setPinValue] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setPinValue('');
+      setError('');
+      setBusy(false);
+    }
+  }, [visible]);
+
+  const submit = async () => {
+    if (pin.length < 4) {
+      setError('Enter your current PIN.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const remaining = await getPinLockoutRemainingMs();
+      if (remaining > 0) {
+        setError(`Too many attempts. Try again in ${formatLockoutDuration(remaining)}.`);
+        return;
+      }
+      const result = await verifyPin(pin);
+      if (result === 'ok') {
+        onResult(true);
+        return;
+      }
+      if (result === 'locked') {
+        const ms = await getPinLockoutRemainingMs();
+        setError(`Too many attempts. Try again in ${formatLockoutDuration(ms)}.`);
+      } else {
+        setError('Incorrect PIN.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: t.overlay, justifyContent: 'center', padding: Spacing.xl }}>
+        <View style={{ backgroundColor: t.background, borderRadius: Radius.xl, padding: Spacing.lg, gap: Spacing.md }}>
+          <Text variant="subtitle">{title}</Text>
+          <TextField label="PIN" value={pin} onChangeText={setPinValue} keyboardType="number-pad" secureTextEntry maxLength={6} />
+          {error ? <Text variant="caption" color={t.danger}>{error}</Text> : null}
+          <View style={{ flexDirection: 'row', gap: Spacing.md }}>
+            <Button title="Cancel" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+            <Button title={busy ? 'Checking…' : 'Confirm'} onPress={submit} loading={busy} style={{ flex: 1 }} />
           </View>
         </View>
       </View>

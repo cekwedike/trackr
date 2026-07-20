@@ -136,7 +136,7 @@ export default function OrderDetail() {
 
   return (
     <Screen>
-      <AppHeader title={order.customer_name || `${terms.order} #${order.id}`} back right={<IconButton icon="create-outline" tone="primary" onPress={() => setEditing(true)} />} />
+      <AppHeader title={order.customer_name || terms.order} back right={<IconButton icon="create-outline" tone="primary" onPress={() => setEditing(true)} />} />
 
       <DetailHero
         label={balance > 0 ? 'Balance due' : 'Fully paid'}

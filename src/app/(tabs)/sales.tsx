@@ -42,7 +42,7 @@ export default function SalesScreen() {
               <ListRow
                 icon="cart"
                 iconTone="success"
-                title={s.customer_name ? `${s.customer_name}` : `${terms.sale} #${s.id}`}
+                title={s.customer_name || terms.sale}
                 subtitle={`${formatDateTime(s.occurred_at)} · ${s.item_count} item(s)`}
                 onPress={() => router.push(`/sales/${s.id}`)}
                 right={

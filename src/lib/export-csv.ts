@@ -87,7 +87,6 @@ async function exportCsv<T>(
 
 export function exportSalesCsv(): Promise<CsvExportResult> {
   return exportCsv('trackr-sales', () => listSales(100000), [
-    { header: 'ID', value: (s) => s.id },
     { header: 'Date', value: (s) => formatDateTime(s.occurred_at) },
     { header: 'Payment method', value: (s) => s.payment_method },
     { header: 'Customer', value: (s) => s.customer_name },
@@ -101,7 +100,6 @@ export function exportSalesCsv(): Promise<CsvExportResult> {
 
 export function exportExpensesCsv(): Promise<CsvExportResult> {
   return exportCsv('trackr-expenses', () => listExpenses(100000), [
-    { header: 'ID', value: (e) => e.id },
     { header: 'Date', value: (e) => formatDateTime(e.occurred_at) },
     { header: 'Amount', value: (e) => money(e.amount) },
     { header: 'Category', value: (e) => e.category },
@@ -113,7 +111,6 @@ export function exportExpensesCsv(): Promise<CsvExportResult> {
 
 export function exportCustomersCsv(): Promise<CsvExportResult> {
   return exportCsv('trackr-customers', () => listCustomers(), [
-    { header: 'ID', value: (c) => c.id },
     { header: 'Name', value: (c) => c.name },
     { header: 'Phone', value: (c) => c.phone },
     { header: 'Email', value: (c) => c.email },
@@ -126,7 +123,6 @@ export function exportCustomersCsv(): Promise<CsvExportResult> {
 
 export function exportInventoryCsv(): Promise<CsvExportResult> {
   return exportCsv('trackr-inventory', () => listProducts(true), [
-    { header: 'ID', value: (p) => p.id },
     { header: 'Name', value: (p) => p.name },
     { header: 'Category', value: (p) => p.category },
     { header: 'SKU', value: (p) => p.sku },
@@ -142,7 +138,6 @@ export function exportInventoryCsv(): Promise<CsvExportResult> {
 
 export function exportOrdersCsv(): Promise<CsvExportResult> {
   return exportCsv('trackr-orders', () => listOrders(), [
-    { header: 'ID', value: (o) => o.id },
     { header: 'Customer', value: (o) => o.customer_name },
     { header: 'Status', value: (o) => o.status },
     { header: 'Due date', value: (o) => formatDate(o.due_at) },

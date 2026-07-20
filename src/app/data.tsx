@@ -3,11 +3,17 @@ import { Alert, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
 import { HelpTip } from '@/components/help';
+import { PassphraseModal } from '@/components/passphrase-modal';
 import { AppHeader, Button, Card, Screen, SectionHeader, Text, type IconName } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
-import { exportBackup, importBackup } from '@/lib/backup';
+import {
+  exportBackup,
+  importBackupWithPassphrase,
+  importLegacyBackup,
+  pickBackupFile,
+} from '@/lib/backup';
 import { clearDemoData, loadDemoData, type DemoCounts } from '@/lib/demo-data';
 import { toUserMessage } from '@/lib/errors';
 import {
@@ -51,6 +57,9 @@ export default function DataScreen() {
   const confirm = useConfirm();
   const { reloadSettings } = useApp();
   const [busy, setBusy] = useState<string | null>(null);
+  const [exportPassModal, setExportPassModal] = useState(false);
+  const [importPassModal, setImportPassModal] = useState(false);
+  const [pendingImport, setPendingImport] = useState<Uint8Array | null>(null);
 
   /** Run a guarded async action: only one at a time, surfacing errors via Alert. */
   const run = async (key: string, fn: () => Promise<void>) => {
@@ -65,10 +74,14 @@ export default function DataScreen() {
     }
   };
 
-  const onBackup = () =>
+  const onBackup = () => setExportPassModal(true);
+
+  const runExport = (passphrase: string) => {
+    setExportPassModal(false);
     run('backup', async () => {
-      await exportBackup();
+      await exportBackup(passphrase);
     });
+  };
 
   const onRestore = async () => {
     const choice = await confirm({
@@ -81,9 +94,44 @@ export default function DataScreen() {
       ],
     });
     if (choice !== 'ok') return;
+
     run('restore', async () => {
-      const result = await importBackup();
-      if (!result.imported) return; // user cancelled the file picker
+      const picked = await pickBackupFile();
+      if (!picked.picked) return;
+
+      if (picked.kind === 'encrypted') {
+        setPendingImport(picked.bytes);
+        setImportPassModal(true);
+        return;
+      }
+
+      const legacy = await confirm({
+        title: 'Unencrypted backup',
+        message:
+          'This older backup is not passphrase-protected. Anyone with the file can read your books. Restore it anyway?',
+        actions: [
+          { label: 'Restore anyway', style: 'destructive', value: 'ok' },
+          { label: 'Cancel', style: 'cancel', value: 'cancel' },
+        ],
+      });
+      if (legacy !== 'ok') return;
+
+      const result = await importLegacyBackup(picked.bytes, picked.kind);
+      await reloadSettings();
+      Alert.alert('Restore complete', `Your data was restored from the backup (${result.tables} tables).`);
+    });
+  };
+
+  const runEncryptedImport = (passphrase: string) => {
+    if (!pendingImport) {
+      setImportPassModal(false);
+      return;
+    }
+    setImportPassModal(false);
+    const bytes = pendingImport;
+    setPendingImport(null);
+    run('restore', async () => {
+      const result = await importBackupWithPassphrase(bytes, passphrase);
       await reloadSettings();
       Alert.alert('Restore complete', `Your data was restored from the backup (${result.tables} tables).`);
     });
@@ -132,11 +180,11 @@ export default function DataScreen() {
             title="Data & backup"
             subtitle="Keep your business data safe"
             paragraphs={[
-              'Trackr stores everything on this device only. Back up regularly so you never lose your records if your phone is lost or replaced.',
+              'Trackr stores everything on this device only. Back up regularly with a passphrase so you never lose your records if your phone is lost or replaced — and so shared files stay protected.',
             ]}
             points={[
-              { term: 'Backup', desc: 'A zip file with all of your Trackr data plus voice notes and photos. Save it to Google Drive, Files or email.' },
-              { term: 'Restore', desc: 'Load a backup zip (or older JSON) back into Trackr. It replaces everything currently in the app.' },
+              { term: 'Backup', desc: 'A passphrase-encrypted file with all of your Trackr data plus voice notes and photos. Save it to Google Drive, Files or email.' },
+              { term: 'Restore', desc: 'Load an encrypted backup (or older unprotected zip/JSON) back into Trackr. It replaces everything currently in the app.' },
               { term: 'CSV export', desc: 'A spreadsheet of one module (opens in Excel or Google Sheets) for sharing or accounting.' },
             ]}
           />
@@ -148,8 +196,8 @@ export default function DataScreen() {
         <SectionHeader title="Back up now" icon="cloud-upload" />
         <Card style={{ gap: Spacing.md }}>
           <Text variant="body" color={t.textSecondary}>
-            Save a complete copy of everything in Trackr — including voice notes and photos — as a zip file. Keep it
-            somewhere safe like Google Drive, Files or your email so you can recover your data later.
+            Save a complete, passphrase-protected copy of everything in Trackr — including voice notes and photos.
+            You’ll need that passphrase to restore. Keep the file somewhere safe like Google Drive, Files or your email.
           </Text>
           <Button
             title="Back up now"
@@ -166,8 +214,8 @@ export default function DataScreen() {
         <SectionHeader title="Restore from a file" icon="cloud-download" />
         <Card style={{ gap: Spacing.md }}>
           <Text variant="body" color={t.textSecondary}>
-            Bring back data from a Trackr backup zip (or an older JSON backup). This overwrites everything currently in
-            Trackr, so only use it on a fresh install or when you want to roll back to a saved copy.
+            Bring back data from a Trackr encrypted backup (or an older unprotected zip/JSON). This overwrites
+            everything currently in Trackr, so only use it on a fresh install or when you want to roll back.
           </Text>
           <Button
             title="Restore from backup"
@@ -230,6 +278,28 @@ export default function DataScreen() {
           />
         </Card>
       </View>
+
+      <PassphraseModal
+        visible={exportPassModal}
+        mode="export"
+        title="Protect this backup"
+        message="Choose a passphrase. You’ll need it to restore. Don’t share the file without it."
+        confirmLabel="Export"
+        onClose={() => setExportPassModal(false)}
+        onSubmit={runExport}
+      />
+      <PassphraseModal
+        visible={importPassModal}
+        mode="import"
+        title="Enter backup passphrase"
+        message="This backup is encrypted. Enter the passphrase used when it was exported."
+        confirmLabel="Restore"
+        onClose={() => {
+          setImportPassModal(false);
+          setPendingImport(null);
+        }}
+        onSubmit={runEncryptedImport}
+      />
     </Screen>
   );
 }

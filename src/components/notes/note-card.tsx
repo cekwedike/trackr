@@ -7,7 +7,7 @@ import type { Note } from '@/db/types';
 import { useTheme, useThemeName } from '@/hooks/use-theme';
 import { fromNow } from '@/lib/date';
 
-import { entityMeta } from './entities';
+import { entityMeta, linkDisplayTitle } from './entities';
 import { useNoteColorTokens } from './palette';
 import type { NoteEntityLink } from '@/db/repos/notes';
 
@@ -120,7 +120,7 @@ export function NoteCard({
               >
                 <Ionicons name={meta.icon} size={11} color={c.accent} />
                 <Text variant="caption" numberOfLines={1} style={{ color: t.textSecondary, maxWidth: 110 }}>
-                  {a.target_title || meta.label}
+                  {linkDisplayTitle(a.target_title, a.target_type)}
                 </Text>
               </View>
             );

@@ -1,4 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, Platform, type AppStateStatus } from 'react-native';
+import * as ScreenCapture from 'expo-screen-capture';
 
 import { getIndustry, type IndustryConfig, type IndustryTerms } from '@/constants/industries';
 import { getSettings, updateSettings } from '@/db/repos/settings';
@@ -7,6 +9,9 @@ import { formatMoney as fmtMoney } from '@/lib/money';
 import { ensureNotificationHandler } from '@/lib/notifications';
 import { toUserMessage } from '@/lib/errors';
 import { runDueRecurring } from '@/lib/recurring';
+
+/** Grace before re-locking after background/inactive (share sheets, pickers). */
+const BACKGROUND_LOCK_GRACE_MS = 15_000;
 
 interface AppContextValue {
   ready: boolean;
@@ -83,6 +88,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const lock = useCallback(() => setLocked(true), []);
   const unlock = useCallback(() => setLocked(false), []);
+
+  // Re-lock after the app has been backgrounded/inactive long enough.
+  // Short grace avoids locking during share sheets, document pickers, and biometrics.
+  const backgroundTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const lockEnabled = settings?.lock_enabled === 1 && settings?.onboarded === 1;
+    if (!lockEnabled) {
+      if (backgroundTimer.current) {
+        clearTimeout(backgroundTimer.current);
+        backgroundTimer.current = null;
+      }
+      return;
+    }
+
+    const onChange = (next: AppStateStatus) => {
+      if (next === 'active') {
+        if (backgroundTimer.current) {
+          clearTimeout(backgroundTimer.current);
+          backgroundTimer.current = null;
+        }
+        return;
+      }
+      // background or inactive
+      if (backgroundTimer.current) clearTimeout(backgroundTimer.current);
+      backgroundTimer.current = setTimeout(() => {
+        backgroundTimer.current = null;
+        setLocked(true);
+      }, BACKGROUND_LOCK_GRACE_MS);
+    };
+
+    const sub = AppState.addEventListener('change', onChange);
+    return () => {
+      sub.remove();
+      if (backgroundTimer.current) {
+        clearTimeout(backgroundTimer.current);
+        backgroundTimer.current = null;
+      }
+    };
+  }, [settings?.lock_enabled, settings?.onboarded]);
+
+  // When app lock is enabled, blur iOS app-switcher snapshots of the books.
+  // Lock screen itself applies FLAG_SECURE / full capture blocking separately.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const lockEnabled = settings?.lock_enabled === 1 && settings?.onboarded === 1;
+    if (!lockEnabled || locked) return;
+    ScreenCapture.enableAppSwitcherProtectionAsync(0.65).catch(() => {});
+    return () => {
+      ScreenCapture.disableAppSwitcherProtectionAsync().catch(() => {});
+    };
+  }, [settings?.lock_enabled, settings?.onboarded, locked]);
 
   const industry = useMemo(() => getIndustry(settings?.industry), [settings?.industry]);
   const terms = industry.terms;

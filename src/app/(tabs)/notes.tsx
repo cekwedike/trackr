@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, useWindowDimensions, View } from 'react-native';
 
 import { Entrance } from '@/components/anim';
-import { ENTITY_ROUTE, entityMeta } from '@/components/notes/entities';
+import { ENTITY_ROUTE, entityMeta, linkDisplayTitle } from '@/components/notes/entities';
 import { NoteCard, NoteListRow } from '@/components/notes/note-card';
 import { NOTE_TYPE_META } from '@/components/notes/note-type-picker';
 import { ViewSwitcher, type NotesView } from '@/components/notes/view-switcher';
@@ -306,7 +306,7 @@ function ConnectionView({
           key,
           type: l.target_type,
           id: l.target_id,
-          title: l.target_title || entityMeta(l.target_type).label,
+          title: linkDisplayTitle(l.target_title, l.target_type),
           notes: [],
         };
         map.set(key, g);

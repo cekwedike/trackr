@@ -290,15 +290,19 @@ function buildFaqs(terms: IndustryTerms): FaqCategory[] {
       items: [
         {
           q: 'How do I lock the app with a PIN?',
-          a: 'Go to Settings → Security → App lock (PIN) and set a 4–6 digit PIN. Trackr will ask for it each time you open the app.',
+          a: 'Go to Settings → Security → App lock (PIN) and set a 4–6 digit PIN. Trackr asks for it when you open the app and again after you leave it in the background for a short time.',
+        },
+        {
+          q: 'Does app lock encrypt my books?',
+          a: 'No. App lock is a gate that slows casual access (PIN or biometrics). It does not encrypt the database on disk. Use a strong device screen lock, and always protect backups with a passphrase when you export them.',
         },
         {
           q: 'Can I use fingerprint or face unlock?',
-          a: 'Yes — once a PIN is set, turn on "Biometric unlock" in Settings → Security. You’ll need biometrics already set up on your device. The PIN stays as a fallback.',
+          a: 'Yes — once a PIN is set, turn on "Unlock with biometrics" in Settings → Security. You’ll need biometrics already set up on your device. The PIN stays as a fallback.',
         },
         {
           q: 'I forgot my PIN — what now?',
-          a: 'For your privacy the PIN can’t be recovered. If you have a backup file, you can reinstall the app and restore it. Otherwise the app data must be cleared to reset the lock, which erases local data — so keep regular backups.',
+          a: 'For your privacy the PIN can’t be recovered. If you have a passphrase-protected backup, you can reinstall the app and restore it. Otherwise the app data must be cleared to reset the lock, which erases local data — so keep regular backups.',
         },
       ],
     },
@@ -309,15 +313,15 @@ function buildFaqs(terms: IndustryTerms): FaqCategory[] {
       items: [
         {
           q: 'How do I back up my data?',
-          a: 'Open Settings → Data → Export backup. This saves ALL your data to a single file you can store in your files, email or cloud drive. Do this regularly.',
+          a: 'Open Settings → Data → Export backup (or Data & backup → Back up now). Choose a passphrase — new backups are encrypted with it. Store the file in Files, email or a cloud drive you control. Do this regularly, especially before sharing a backup.',
         },
         {
           q: 'How do I restore a backup?',
-          a: 'Settings → Data → Restore backup, then pick your backup file. Warning: restoring REPLACES all current data with the backup, so only restore onto an empty or older device.',
+          a: 'Settings → Data → Restore backup (or Data & backup). Pick your file. Encrypted backups ask for the passphrase. Older unprotected zip/JSON files still work, but you’ll see a warning that anyone with that file can read your books. Restoring REPLACES all current data.',
         },
         {
           q: 'Will I lose my data if I uninstall?',
-          a: 'Possibly — data lives on your device. Uninstalling can remove it. Always export a backup before uninstalling, switching phones or clearing app storage.',
+          a: 'Possibly — data lives on your device. Uninstalling can remove it. Always export a passphrase-protected backup before uninstalling, switching phones or clearing app storage.',
         },
       ],
     },
