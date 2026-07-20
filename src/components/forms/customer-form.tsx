@@ -101,6 +101,8 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
       }
       if (onDone) onDone();
       else router.back();
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this customer. Please try again.'));
     } finally {
       setSaving(false);
     }

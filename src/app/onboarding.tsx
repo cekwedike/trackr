@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -24,7 +24,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { isBiometricAvailable, setPin } from '@/lib/auth';
 import { hexToRgba } from '@/lib/color';
 import { successFeedback } from '@/lib/haptics';
-import { PermissionRationale, requestNotifications, type PermissionOutcome } from '@/lib/permissions';
+import {
+  notificationsPermissionMessage,
+  openAppPermissionSettings,
+  PermissionRationale,
+  requestNotifications,
+  type PermissionOutcome,
+} from '@/lib/permissions';
 
 export default function Onboarding() {
   const t = useTheme();
@@ -51,7 +57,15 @@ export default function Onboarding() {
   const enableNotifications = async () => {
     setRequestingNotif(true);
     try {
-      setNotifOutcome(await requestNotifications());
+      const outcome = await requestNotifications();
+      setNotifOutcome(outcome);
+      if (outcome === 'blocked') {
+        const msg = notificationsPermissionMessage(outcome);
+        Alert.alert(msg.title, msg.message, [
+          { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
+          { text: 'OK', style: 'cancel' },
+        ]);
+      }
     } finally {
       setRequestingNotif(false);
     }
@@ -237,6 +251,10 @@ export default function Onboarding() {
 
                   {notifOutcome === 'granted' ? (
                     <Text variant="caption" color={t.success}>Notifications enabled. You&apos;re all set.</Text>
+                  ) : notifOutcome === 'blocked' ? (
+                    <Text variant="caption" color={t.textSecondary}>
+                      Notifications are blocked. Enable them in system Settings, then tap Try again.
+                    </Text>
                   ) : notifOutcome === 'denied' ? (
                     <Text variant="caption" color={t.textSecondary}>
                       No problem — you can turn reminders on anytime from Settings.
@@ -245,9 +263,19 @@ export default function Onboarding() {
 
                   {notifOutcome !== 'granted' ? (
                     <Button
-                      title={notifOutcome === 'denied' ? 'Try again' : 'Enable reminders'}
+                      title={
+                        notifOutcome === 'blocked'
+                          ? 'Open Settings'
+                          : notifOutcome === 'denied'
+                            ? 'Try again'
+                            : 'Enable reminders'
+                      }
                       icon="notifications-outline"
-                      onPress={enableNotifications}
+                      onPress={
+                        notifOutcome === 'blocked'
+                          ? () => void openAppPermissionSettings()
+                          : enableNotifications
+                      }
                       loading={requestingNotif}
                     />
                   ) : null}

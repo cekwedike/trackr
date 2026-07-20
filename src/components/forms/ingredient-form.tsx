@@ -10,6 +10,7 @@ import { useApp } from '@/context/app-context';
 import { adjustIngredientStock, createIngredient, deleteIngredient, updateIngredient } from '@/db/repos/ingredients';
 import type { Ingredient } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import { toUserMessage } from '@/lib/errors';
 import { fromMinor, formatQty, parseMoney } from '@/lib/money';
 
 const UNITS = ['g', 'kg', 'ml', 'litre', 'pcs', 'pack', 'cup', 'tbsp', 'tsp', 'bag'];
@@ -56,6 +57,8 @@ export function IngredientForm({ initial }: { initial?: Ingredient }) {
       if (initial) await updateIngredient(initial.id, payload);
       else await createIngredient(payload);
       router.back();
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this ingredient. Please try again.'));
     } finally {
       setSaving(false);
     }

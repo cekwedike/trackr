@@ -56,13 +56,38 @@ export async function hasNotificationPermission(): Promise<boolean> {
 }
 
 /**
+ * Current notification permission snapshot (no prompt).
+ * Use `canAskAgain === false` + denied to detect a permanent block → Settings.
+ */
+export async function getNotificationPermissionState(): Promise<{
+  granted: boolean;
+  canAskAgain: boolean;
+  status: Notifications.PermissionStatus;
+}> {
+  const settings = await Notifications.getPermissionsAsync();
+  return {
+    granted:
+      settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL,
+    canAskAgain: settings.canAskAgain,
+    status: settings.status,
+  };
+}
+
+/**
  * Ensure the channel exists and the permission is granted, prompting the user
  * once if needed. Returns whether notifications are ultimately allowed.
+ * Does not short-circuit undetermined — always reaches requestPermissionsAsync
+ * when the OS can still ask.
  */
 export async function requestNotificationPermission(): Promise<boolean> {
   ensureNotificationHandler();
   await ensureRemindersChannel();
   if (await hasNotificationPermission()) return true;
+  const existing = await Notifications.getPermissionsAsync();
+  // Permanently denied: OS will not show a dialog; callers should open Settings.
+  if (existing.status === Notifications.PermissionStatus.DENIED && !existing.canAskAgain) {
+    return false;
+  }
   const req = await Notifications.requestPermissionsAsync({
     ios: { allowAlert: true, allowBadge: true, allowSound: true },
   });

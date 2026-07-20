@@ -35,7 +35,11 @@ import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert, Linking } from 'react-native';
 
-import { hasNotificationPermission, requestNotificationPermission } from '@/lib/notifications';
+import {
+  getNotificationPermissionState,
+  hasNotificationPermission,
+  requestNotificationPermission,
+} from '@/lib/notifications';
 
 export type PermissionOutcome = 'granted' | 'denied' | 'blocked';
 
@@ -87,11 +91,34 @@ export function confirmPermissionRationale(kind: PermissionKind): Promise<boolea
 /**
  * Ensure notification permission, prompting once if needed. Creates the Android
  * channel as part of the flow so notifications render as branded alerts.
+ * Returns `blocked` when the OS will not show the dialog again (open Settings).
  */
 export async function requestNotifications(): Promise<PermissionOutcome> {
   if (await hasNotificationPermission()) return 'granted';
+  const existing = await getNotificationPermissionState();
+  if (existing.status === 'denied' && !existing.canAskAgain) return 'blocked';
   const granted = await requestNotificationPermission();
-  return granted ? 'granted' : 'denied';
+  if (granted) return 'granted';
+  const after = await getNotificationPermissionState();
+  if (after.status === 'denied' && !after.canAskAgain) return 'blocked';
+  return 'denied';
+}
+
+export function notificationsPermissionMessage(outcome: PermissionOutcome): {
+  title: string;
+  message: string;
+} {
+  if (outcome === 'blocked') {
+    return {
+      title: 'Notifications blocked',
+      message:
+        'Trackr can’t send reminders. Enable Notifications for Trackr in system Settings, then try again.',
+    };
+  }
+  return {
+    title: PermissionRationale.notifications.title,
+    message: PermissionRationale.notifications.message,
+  };
 }
 
 /** Current contacts permission without prompting. */

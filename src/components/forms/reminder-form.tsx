@@ -8,6 +8,7 @@ import { Spacing } from '@/constants/theme';
 import { createReminder, updateReminder } from '@/db/repos/reminders';
 import type { Recurrence, Reminder } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import { toUserMessage } from '@/lib/errors';
 import { cancelReminder, scheduleReminder } from '@/lib/notifications';
 
 const RECURRENCE: { value: Recurrence; label: string }[] = [
@@ -37,12 +38,23 @@ export function ReminderForm({ initial, onDone }: { initial?: Reminder; onDone?:
       return;
     }
     setSaving(true);
+    const oldNotificationId = initial?.notification_id ?? null;
+    let scheduledId: string | null = null;
     try {
-      if (initial?.notification_id) await cancelReminder(initial.notification_id);
       const shouldNotify = !initial || initial.completed === 0;
+
+      // Schedule the new alert first so a failed schedule never drops the old one.
+      if (shouldNotify) {
+        scheduledId = await scheduleReminder(title.trim(), body.trim(), due, recurrence);
+      }
+
+      // Keep the previous OS notification if reschedule failed (permission / OS error)
+      // and this isn’t a clearly past one-shot. Completed reminders clear the id.
+      const pastOnce = recurrence === 'none' && due.getTime() <= Date.now();
       const notificationId = shouldNotify
-        ? await scheduleReminder(title.trim(), body.trim(), due, recurrence)
+        ? (scheduledId ?? (pastOnce ? null : oldNotificationId))
         : null;
+
       const payload = {
         title: title.trim(),
         body: body.trim() || null,
@@ -52,12 +64,27 @@ export function ReminderForm({ initial, onDone }: { initial?: Reminder; onDone?:
         target_type: initial?.target_type,
         target_id: initial?.target_id,
       };
-      if (initial) await updateReminder(initial.id, payload);
-      else await createReminder(payload);
-      if (!notificationId && shouldNotify && recurrence === 'none' && due.getTime() <= Date.now()) {
+
+      try {
+        if (initial) await updateReminder(initial.id, payload);
+        else await createReminder(payload);
+      } catch (dbErr) {
+        // Roll back the newly scheduled alert if the DB write failed.
+        if (scheduledId) await cancelReminder(scheduledId);
+        throw dbErr;
+      }
+
+      // DB succeeded — cancel the previous alert only when it was replaced or cleared.
+      if (oldNotificationId && oldNotificationId !== notificationId) {
+        await cancelReminder(oldNotificationId);
+      }
+
+      if (!scheduledId && shouldNotify && pastOnce) {
         Alert.alert('Saved', 'Reminder saved, but the time is in the past so no notification was scheduled.');
       }
       finish();
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this reminder. Please try again.'));
     } finally {
       setSaving(false);
     }

@@ -52,7 +52,7 @@ const THUMB = 84;
 
 /**
  * Photos/receipts attached to an expense. Thumbnails scroll horizontally;
- * "Add photo" picks from the library and persists a private copy; tapping a
+ * "Add photo" offers camera or library and persists a private copy; tapping a
  * thumbnail confirms removal. Files live under the app document directory, so
  * they survive cache clears (see @/lib/attachments).
  */

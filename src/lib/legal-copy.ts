@@ -30,6 +30,7 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
       'Notifications — to remind you about things like daily reviews, low stock, overdue amounts, orders, birthdays, or backup nudges, if you enable them.',
       'Biometrics / device credentials — to unlock the App if you turn on app lock with fingerprint or face unlock.',
       'Photos / media library — to attach images to products or records when you choose to.',
+      'Camera — to take a photo for products or records when you choose to.',
       'Contacts — to import people into your customer list when you choose that feature (when available). Trackr does not upload your address book to our servers.',
       'Microphone — to record voice notes when you choose that feature (when available). Audio stays on your device unless you include it in a backup file you export.',
     ],
@@ -154,7 +155,7 @@ export const OFFLINE_SECTIONS: LegalSection[] = [
   {
     heading: 'Permissions and offline use',
     body: [
-      'Denying optional permissions (contacts, microphone, notifications, photos, biometrics) does not stop you from using core offline bookkeeping; it only limits the related feature.',
+      'Denying optional permissions (contacts, microphone, notifications, photos, camera, biometrics) does not stop you from using core offline bookkeeping; it only limits the related feature.',
     ],
   },
 ];

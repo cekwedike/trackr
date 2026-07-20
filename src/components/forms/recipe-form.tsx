@@ -14,6 +14,7 @@ import { listProducts } from '@/db/repos/products';
 import { createRecipe, deleteRecipe, getRecipeItems, updateRecipe } from '@/db/repos/recipes';
 import type { Ingredient, Product, Recipe } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import { toUserMessage } from '@/lib/errors';
 
 interface Row {
   key: string;
@@ -90,6 +91,8 @@ export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () 
       else await createRecipe(payload);
       if (onDone) onDone();
       else router.back();
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this recipe. Please try again.'));
     } finally {
       setSaving(false);
     }

@@ -12,6 +12,7 @@ import { listProducts } from '@/db/repos/products';
 import { createSale, getSaleItems, updateSale } from '@/db/repos/sales';
 import type { Customer, PaymentMethod, Product, Sale } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import { toUserMessage } from '@/lib/errors';
 import { fromMinor, parseMoney } from '@/lib/money';
 
 interface LineItem {
@@ -120,6 +121,8 @@ export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => v
       else await createSale(payload);
       if (onDone) onDone();
       else router.back();
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this sale. Please try again.'));
     } finally {
       setSaving(false);
     }

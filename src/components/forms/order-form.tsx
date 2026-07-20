@@ -14,6 +14,7 @@ import { listProducts } from '@/db/repos/products';
 import { createOrder, deleteOrder, getOrderItems, ORDER_STATUSES, updateOrder } from '@/db/repos/orders';
 import type { Customer, Order, OrderStatus, Product } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import { toUserMessage } from '@/lib/errors';
 import { fromMinor, parseMoney } from '@/lib/money';
 
 interface Row {
@@ -86,6 +87,8 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
       else await createOrder(payload);
       if (onDone) onDone();
       else router.back();
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this order. Please try again.'));
     } finally {
       setSaving(false);
     }

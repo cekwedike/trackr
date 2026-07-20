@@ -34,6 +34,11 @@ import { dayjs } from '@/lib/date';
 import { toUserMessage } from '@/lib/errors';
 import { cancelDailyNudge, cancelWeeklyNudge, scheduleDailyNudge, scheduleWeeklyNudge } from '@/lib/notifications';
 import {
+  notificationsPermissionMessage,
+  openAppPermissionSettings,
+  requestNotifications,
+} from '@/lib/permissions';
+import {
   getAllNotifCategories,
   NOTIF_CATEGORY_META,
   setNotifCategoryEnabled,
@@ -240,10 +245,27 @@ export default function Settings() {
   const toggleDailyNudge = async () => {
     const next = !dailyNudge;
     if (next) {
-      const id = await scheduleDailyNudge(dailyHour, dailyMinute);
+      let id = await scheduleDailyNudge(dailyHour, dailyMinute);
       if (!id) {
-        Alert.alert('Notifications off', 'Enable notifications for Trackr to get daily nudges.');
-        return;
+        const outcome = await requestNotifications();
+        if (outcome === 'granted') {
+          id = await scheduleDailyNudge(dailyHour, dailyMinute);
+        }
+        if (!id) {
+          const blocked = outcome === 'blocked';
+          const msg = notificationsPermissionMessage(blocked ? 'blocked' : 'denied');
+          Alert.alert(
+            blocked ? msg.title : 'Notifications off',
+            blocked ? msg.message : 'Enable notifications for Trackr to get daily nudges.',
+            blocked
+              ? [
+                  { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
+                  { text: 'OK', style: 'cancel' },
+                ]
+              : [{ text: 'OK' }],
+          );
+          return;
+        }
       }
     } else {
       await cancelDailyNudge();
@@ -266,10 +288,27 @@ export default function Settings() {
   const toggleWeeklyNudge = async () => {
     const next = !weeklyNudge;
     if (next) {
-      const id = await scheduleWeeklyNudge(WEEKLY_NUDGE_WEEKDAY, WEEKLY_NUDGE_HOUR, 0);
+      let id = await scheduleWeeklyNudge(WEEKLY_NUDGE_WEEKDAY, WEEKLY_NUDGE_HOUR, 0);
       if (!id) {
-        Alert.alert('Notifications off', 'Enable notifications for Trackr to get weekly nudges.');
-        return;
+        const outcome = await requestNotifications();
+        if (outcome === 'granted') {
+          id = await scheduleWeeklyNudge(WEEKLY_NUDGE_WEEKDAY, WEEKLY_NUDGE_HOUR, 0);
+        }
+        if (!id) {
+          const blocked = outcome === 'blocked';
+          const msg = notificationsPermissionMessage(blocked ? 'blocked' : 'denied');
+          Alert.alert(
+            blocked ? msg.title : 'Notifications off',
+            blocked ? msg.message : 'Enable notifications for Trackr to get weekly nudges.',
+            blocked
+              ? [
+                  { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
+                  { text: 'OK', style: 'cancel' },
+                ]
+              : [{ text: 'OK' }],
+          );
+          return;
+        }
       }
     } else {
       await cancelWeeklyNudge();

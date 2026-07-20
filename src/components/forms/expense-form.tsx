@@ -11,6 +11,7 @@ import { useApp } from '@/context/app-context';
 import { createExpense, deleteExpense, EXPENSE_CATEGORIES, updateExpense } from '@/db/repos/expenses';
 import type { Expense } from '@/db/types';
 import { fromMinor, parseMoney } from '@/lib/money';
+import { toUserMessage } from '@/lib/errors';
 
 const PAYMENT = ['Cash', 'Transfer', 'POS', 'Card', 'Other'];
 
@@ -52,6 +53,8 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
       if (initial) await updateExpense(initial.id, payload);
       else await createExpense(payload);
       router.back();
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this expense. Please try again.'));
     } finally {
       setSaving(false);
     }

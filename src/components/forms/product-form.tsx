@@ -14,6 +14,7 @@ import { adjustProductStock, createProduct, deleteProduct, updateProduct } from 
 import type { Product } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
 import { pickOrCaptureAttachmentImage } from '@/lib/attachments';
+import { toUserMessage } from '@/lib/errors';
 import { fromMinor, formatQty, parseMoney } from '@/lib/money';
 
 const UNITS = ['pcs', 'pack', 'box', 'kg', 'g', 'litre', 'ml', 'plate', 'bottle', 'bag'];
@@ -72,6 +73,8 @@ export function ProductForm({ initial }: { initial?: Product }) {
       if (initial) await updateProduct(initial.id, payload);
       else await createProduct(payload);
       router.back();
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this product. Please try again.'));
     } finally {
       setSaving(false);
     }
