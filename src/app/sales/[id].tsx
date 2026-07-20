@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
+import { SaleForm } from '@/components/forms/sale-form';
 import { useUndo } from '@/components/undo';
 import { AppHeader, Button, Card, Chip, DetailHero, Divider, IconButton, InfoRow, Screen, SectionHeader, Text } from '@/components/ui';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +16,7 @@ import { addAttachment, type AttachmentEntity, deleteAttachment, listAttachments
 import type { Attachment } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
-import { pickAttachmentImage } from '@/lib/attachments';
+import { pickOrCaptureAttachmentImage } from '@/lib/attachments';
 import { formatDateTime } from '@/lib/date';
 import { pressFeedback } from '@/lib/haptics';
 import { printReceipt, saleToReceipt, shareReceipt } from '@/lib/receipt';
@@ -28,8 +29,9 @@ export default function SaleDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const saleId = Number(id);
   const [sharing, setSharing] = useState(false);
+  const [editing, setEditing] = useState(false);
 
-  const { data, loading } = useAsyncData(async () => {
+  const { data, loading, reload } = useAsyncData(async () => {
     const sale = await getSale(saleId);
     if (!sale) return null;
     const items = await getSaleItems(saleId);
@@ -86,6 +88,10 @@ export default function SaleDetail() {
     );
   }
 
+  if (editing) {
+    return <SaleForm initial={data.sale} onDone={() => { setEditing(false); reload(); }} />;
+  }
+
   const { sale, items, customer } = data;
   const profit = sale.total - sale.cost_total;
 
@@ -122,7 +128,16 @@ export default function SaleDetail() {
 
   return (
     <Screen>
-      <AppHeader title={customer?.name || terms.sale} back right={<IconButton icon="trash-outline" tone="danger" onPress={remove} />} />
+      <AppHeader
+        title={customer?.name || terms.sale}
+        back
+        right={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <IconButton icon="create-outline" tone="primary" onPress={() => setEditing(true)} />
+            <IconButton icon="trash-outline" tone="danger" onPress={remove} />
+          </View>
+        }
+      />
 
       <DetailHero
         label="Total sale"
@@ -210,7 +225,7 @@ export function AttachmentsSection({ entity, entityId }: { entity: AttachmentEnt
     if (busy) return;
     setBusy(true);
     try {
-      const picked = await pickAttachmentImage();
+      const picked = await pickOrCaptureAttachmentImage();
       if (picked) {
         await addAttachment(entity, entityId, picked.uri, picked.mime);
         await refresh();

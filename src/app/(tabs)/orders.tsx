@@ -32,7 +32,7 @@ export default function OrdersScreen() {
   const { money, terms } = useApp();
   const [filter, setFilter] = useState<'active' | 'all'>('active');
   const { data } = useAsyncData(() => listOrders(), []);
-  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['order', 'customer', 'expense']);
+  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['order', 'customer', 'expense', 'note']);
 
   const orders = (data ?? []).filter((o) => (filter === 'active' ? o.status !== 'delivered' && o.status !== 'cancelled' : true));
 

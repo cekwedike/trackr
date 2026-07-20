@@ -142,6 +142,97 @@ export async function deleteSale(id: number): Promise<void> {
     .catch(() => {});
 }
 
+/**
+ * Replace an existing sale in place: reverse prior stock/debt effects, rewrite
+ * header + line items, then apply the new effects. Keeps the same sale id so
+ * attachments stay linked.
+ */
+export async function updateSale(id: number, input: SaleInput): Promise<void> {
+  const db = await getDb();
+  const sale = await getSale(id);
+  if (!sale) return;
+  const oldItems = await getSaleItems(id);
+  const now = nowIso();
+  const total = input.items.reduce((sum, it) => sum + Math.round(it.unit_price * it.qty), 0);
+  const costTotal = input.items.reduce((sum, it) => sum + Math.round(it.unit_cost * it.qty), 0);
+
+  await db.withTransactionAsync(async () => {
+    for (const it of oldItems) {
+      if (it.product_id) {
+        await db.runAsync('UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ?', [
+          it.qty,
+          now,
+          it.product_id,
+        ]);
+        await db.runAsync(
+          'INSERT INTO stock_movements (item_type, item_id, change, reason, created_at) VALUES (?, ?, ?, ?, ?)',
+          ['product', it.product_id, it.qty, 'Sale edited (reverse)', now],
+        );
+      }
+    }
+
+    if (sale.customer_id && sale.payment_method === 'credit') {
+      await db.runAsync('UPDATE customers SET debt_balance = debt_balance - ?, updated_at = ? WHERE id = ?', [
+        sale.total,
+        now,
+        sale.customer_id,
+      ]);
+    }
+
+    await db.runAsync('DELETE FROM sale_items WHERE sale_id = ?', [id]);
+    await db.runAsync(
+      `UPDATE sales SET occurred_at = ?, payment_method = ?, customer_id = ?, total = ?, cost_total = ?, note = ?
+       WHERE id = ?`,
+      [input.occurred_at, input.payment_method, input.customer_id, total, costTotal, input.note ?? null, id],
+    );
+
+    for (const it of input.items) {
+      const lineTotal = Math.round(it.unit_price * it.qty);
+      await db.runAsync(
+        `INSERT INTO sale_items (sale_id, product_id, name, qty, unit_price, unit_cost, line_total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, it.product_id, it.name, it.qty, it.unit_price, it.unit_cost, lineTotal],
+      );
+      if (it.product_id) {
+        await db.runAsync('UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?', [
+          it.qty,
+          now,
+          it.product_id,
+        ]);
+        await db.runAsync(
+          'INSERT INTO stock_movements (item_type, item_id, change, reason, created_at) VALUES (?, ?, ?, ?, ?)',
+          ['product', it.product_id, -it.qty, 'Sale edited', now],
+        );
+      }
+    }
+
+    if (input.customer_id && input.payment_method === 'credit') {
+      await db.runAsync('UPDATE customers SET debt_balance = debt_balance + ?, updated_at = ? WHERE id = ?', [
+        total,
+        now,
+        input.customer_id,
+      ]);
+    }
+  });
+
+  await logAudit('sale', id, 'update', `Updated sale of ${await auditMoney(total)}`);
+  const productIds = [
+    ...oldItems.map((it) => it.product_id),
+    ...input.items.map((it) => it.product_id),
+  ];
+  void import('@/lib/event-notifications')
+    .then(async (m) => {
+      await m.maybeNotifyLowStockForProducts(productIds);
+      if (
+        (sale.customer_id && sale.payment_method === 'credit') ||
+        (input.customer_id && input.payment_method === 'credit')
+      ) {
+        await m.syncPaymentsNudge();
+      }
+    })
+    .catch(() => {});
+}
+
 /** Lightweight row for global search results. */
 export interface SaleSearchRow {
   id: number;

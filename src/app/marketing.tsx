@@ -4,7 +4,7 @@
  */
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Share, View } from 'react-native';
+import { Alert, Pressable, Share, View } from 'react-native';
 
 import { FadeSlide } from '@/components/anim';
 import { useConfirm } from '@/components/confirm';
@@ -33,6 +33,7 @@ import {
   ensureDefaultIdeas,
   listMarketingIdeas,
   setMarketingIdeaDone,
+  updateMarketingIdea,
 } from '@/db/repos/marketing-ideas';
 import {
   createMessageTemplate,
@@ -54,6 +55,8 @@ export default function MarketingScreen() {
   const { terms } = useApp();
   const [editing, setEditing] = useState<MessageTemplate | null | 'new'>(null);
   const [ideaText, setIdeaText] = useState('');
+  const [editingIdeaId, setEditingIdeaId] = useState<number | null>(null);
+  const [editingIdeaTitle, setEditingIdeaTitle] = useState('');
 
   const { data, reload } = useAsyncData(async () => {
     await Promise.all([ensureDefaultTemplates(), ensureDefaultIdeas()]);
@@ -172,16 +175,45 @@ export default function MarketingScreen() {
                   reload();
                 }}
               />
-              <Text
-                variant="body"
-                style={{
-                  flex: 1,
-                  textDecorationLine: idea.done === 1 ? 'line-through' : undefined,
-                  opacity: idea.done === 1 ? 0.55 : 1,
-                }}
-              >
-                {idea.title}
-              </Text>
+              {editingIdeaId === idea.id ? (
+                <>
+                  <TextField
+                    style={{ flex: 1 }}
+                    value={editingIdeaTitle}
+                    onChangeText={setEditingIdeaTitle}
+                    autoFocus
+                  />
+                  <Chip
+                    label="Save"
+                    onPress={async () => {
+                      const next = editingIdeaTitle.trim();
+                      setEditingIdeaId(null);
+                      if (next && next !== idea.title) {
+                        await updateMarketingIdea(idea.id, next);
+                        reload();
+                      }
+                    }}
+                  />
+                </>
+              ) : (
+                <Pressable
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    setEditingIdeaId(idea.id);
+                    setEditingIdeaTitle(idea.title);
+                  }}
+                >
+                  <Text
+                    variant="body"
+                    style={{
+                      textDecorationLine: idea.done === 1 ? 'line-through' : undefined,
+                      opacity: idea.done === 1 ? 0.55 : 1,
+                    }}
+                  >
+                    {idea.title}
+                  </Text>
+                </Pressable>
+              )}
               <Chip
                 label="Remove"
                 onPress={async () => {

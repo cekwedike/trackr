@@ -24,7 +24,10 @@
       "allowBackup": false,
       "permissions": [
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -68,7 +71,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Allow Trackr to attach photos to your products and records.",
-          "cameraPermission": false,
+          "cameraPermission": "Allow Trackr to take photos for your products and records.",
           "microphonePermission": false
         }
       ],

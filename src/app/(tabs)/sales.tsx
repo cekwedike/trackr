@@ -24,7 +24,7 @@ export default function SalesScreen() {
   const t = useTheme();
   const { money, terms } = useApp();
   const { data } = useAsyncData(() => listSales(), []);
-  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['sale', 'expense', 'customer']);
+  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['sale', 'expense', 'customer', 'note']);
 
   const total = (data ?? []).reduce((s, x) => s + x.total, 0);
 

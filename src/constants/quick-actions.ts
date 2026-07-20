@@ -13,6 +13,7 @@ export const QUICK_ACTION_META: Record<QuickActionKey, { icon: IconName; href: H
   profit: { icon: 'calculator', href: '/profit' as Href, label: () => 'Profit' },
   reminder: { icon: 'alarm', href: '/reminders/new' as Href, label: () => 'Reminder' },
   recipe: { icon: 'reader', href: '/recipes/new' as Href, label: (t) => `New ${t.productionLabel.toLowerCase().replace(/s$/, '')}` },
+  note: { icon: 'document-text', href: '/notes/new' as Href, label: () => 'New note' },
 };
 
 /**
@@ -30,6 +31,7 @@ export const QUICK_ACTION_MODULE: Record<QuickActionKey, keyof IndustryModules |
   expense: null,
   profit: null,
   reminder: null,
+  note: null,
 };
 
 /** Whether a quick action is relevant for an industry given its enabled modules. */

@@ -13,7 +13,7 @@ import { getExpense } from '@/db/repos/expenses';
 import type { Attachment } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
-import { pickAttachmentImage } from '@/lib/attachments';
+import { pickOrCaptureAttachmentImage } from '@/lib/attachments';
 
 export default function EditExpense() {
   const t = useTheme();
@@ -76,7 +76,7 @@ function AttachmentsSection({ entity, entityId }: { entity: AttachmentEntity; en
     if (busy) return;
     setBusy(true);
     try {
-      const picked = await pickAttachmentImage();
+      const picked = await pickOrCaptureAttachmentImage();
       if (picked) {
         await addAttachment(entity, entityId, picked.uri, picked.mime);
         await refresh();

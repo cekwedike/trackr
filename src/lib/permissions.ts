@@ -12,6 +12,7 @@
  *  - Photo library (expo-image-picker): requested before attaching product
  *    photos. On modern Android the system photo picker needs no permission, but
  *    requesting keeps behaviour consistent on iOS and older Android.
+ *  - Camera (expo-image-picker): requested before taking a photo for attachments.
  *  - Contacts (expo-contacts): requested before importing people into customers.
  *  - Microphone (expo-audio): requested before recording voice notes.
  *
@@ -32,7 +33,7 @@ import {
 } from 'expo-audio';
 import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 import { hasNotificationPermission, requestNotificationPermission } from '@/lib/notifications';
 
@@ -47,6 +48,10 @@ export const PermissionRationale = {
   photos: {
     title: 'Add photos to your records',
     message: 'Allow photo access so you can attach pictures to your products and records.',
+  },
+  camera: {
+    title: 'Take a photo',
+    message: 'Allow camera access so you can take pictures for your products and records.',
   },
   contacts: {
     title: 'Import your contacts',
@@ -124,7 +129,8 @@ export async function hasMicrophonePermission(): Promise<boolean> {
 
 /**
  * Prompt for microphone access (JIT — call only before voice recording).
- * When `withRationale` is true (default), shows an in-app explanation before the OS dialog.
+ * Flow: check → in-app rationale (Continue) → OS `requestRecordingPermissionsAsync`
+ * (expo-audio / RECORD_AUDIO). Never skip the OS prompt when the system can still ask.
  */
 export async function requestMicrophone(options?: {
   withRationale?: boolean;
@@ -132,14 +138,33 @@ export async function requestMicrophone(options?: {
   const withRationale = options?.withRationale !== false;
   const existing = await getRecordingPermissionsAsync();
   if (existing.granted) return 'granted';
-  if (!existing.canAskAgain) return 'blocked';
+
+  // Only treat as permanently blocked when denied and the OS will not ask again.
+  // Undetermined must still reach requestRecordingPermissionsAsync so the system
+  // microphone dialog can appear (do not early-return on canAskAgain alone).
+  const permanentlyBlocked =
+    !existing.granted && existing.canAskAgain === false && existing.status === 'denied';
+
+  if (permanentlyBlocked) return 'blocked';
+
   if (withRationale) {
     const ok = await confirmPermissionRationale('microphone');
     if (!ok) return 'denied';
   }
+
   const result = await requestRecordingPermissionsAsync();
   if (result.granted) return 'granted';
-  return result.canAskAgain ? 'denied' : 'blocked';
+  if (result.canAskAgain === false) return 'blocked';
+  return 'denied';
+}
+
+/** Open the OS app-settings screen (mic / photos / camera / contacts toggles live there). */
+export async function openAppPermissionSettings(): Promise<void> {
+  try {
+    await Linking.openSettings();
+  } catch {
+    // ignore — caller already showed copy directing the user to Settings
+  }
 }
 
 /** Current photo-library permission without prompting. */
@@ -182,6 +207,49 @@ export function photosPermissionMessage(outcome: PermissionOutcome): { title: st
   return {
     title: PermissionRationale.photos.title,
     message: PermissionRationale.photos.message,
+  };
+}
+
+/** Current camera permission without prompting. */
+export async function hasCameraPermission(): Promise<boolean> {
+  const { granted } = await ImagePicker.getCameraPermissionsAsync();
+  return granted;
+}
+
+/**
+ * Prompt for camera access (JIT — call only before taking a photo).
+ * When already granted, returns granted. When permanently denied, returns blocked.
+ */
+export async function requestCamera(options?: {
+  withRationale?: boolean;
+}): Promise<PermissionOutcome> {
+  const withRationale = options?.withRationale !== false;
+  const existing = await ImagePicker.getCameraPermissionsAsync();
+  if (existing.granted) return 'granted';
+  if (!existing.canAskAgain && existing.status === 'denied') return 'blocked';
+  if (withRationale) {
+    const ok = await confirmPermissionRationale('camera');
+    if (!ok) return 'denied';
+  }
+  const result = await ImagePicker.requestCameraPermissionsAsync();
+  if (result.granted) return 'granted';
+  return result.canAskAgain ? 'denied' : 'blocked';
+}
+
+export function cameraPermissionMessage(outcome: PermissionOutcome): {
+  title: string;
+  message: string;
+} {
+  if (outcome === 'blocked') {
+    return {
+      title: 'Camera access blocked',
+      message:
+        'Trackr can’t use the camera. Enable Camera for Trackr in system Settings, then try again.',
+    };
+  }
+  return {
+    title: PermissionRationale.camera.title,
+    message: PermissionRationale.camera.message,
   };
 }
 

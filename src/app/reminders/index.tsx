@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { Pressable } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
 import { useUndo } from '@/components/undo';
@@ -82,11 +82,12 @@ export default function RemindersScreen() {
                 <Pressable onPress={() => complete(r.id, true)}>
                   <Ionicons name="ellipse-outline" size={24} color={t.textMuted} />
                 </Pressable>
-                <View style={{ flex: 1 }}>
+                <Pressable style={{ flex: 1 }} onPress={() => router.push(`/reminders/${r.id}`)}>
                   <Text variant="body" weight="semibold">{r.title}</Text>
                   <Text variant="caption" color={t.textSecondary}>{formatDateTime(r.due_at)} · {fromNow(r.due_at)}</Text>
-                </View>
+                </Pressable>
                 {r.recurrence !== 'none' ? <Chip label={RECUR_LABEL[r.recurrence]} tone="primary" /> : null}
+                <IconButton icon="create-outline" tone="primary" size={18} onPress={() => router.push(`/reminders/${r.id}`)} />
                 <IconButton icon="trash-outline" tone="danger" size={18} onPress={() => remove(r.id)} />
               </Card>
             ))}
@@ -98,9 +99,10 @@ export default function RemindersScreen() {
                     <Pressable onPress={() => complete(r.id, false)}>
                       <Ionicons name="checkmark-circle" size={24} color={t.success} />
                     </Pressable>
-                    <View style={{ flex: 1 }}>
+                    <Pressable style={{ flex: 1 }} onPress={() => router.push(`/reminders/${r.id}`)}>
                       <Text variant="body" style={{ textDecorationLine: 'line-through' }}>{r.title}</Text>
-                    </View>
+                    </Pressable>
+                    <IconButton icon="create-outline" tone="primary" size={18} onPress={() => router.push(`/reminders/${r.id}`)} />
                     <IconButton icon="trash-outline" tone="danger" size={18} onPress={() => remove(r.id)} />
                   </Card>
                 ))}

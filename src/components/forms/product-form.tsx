@@ -13,7 +13,7 @@ import { useApp } from '@/context/app-context';
 import { adjustProductStock, createProduct, deleteProduct, updateProduct } from '@/db/repos/products';
 import type { Product } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
-import { pickAttachmentImage } from '@/lib/attachments';
+import { pickOrCaptureAttachmentImage } from '@/lib/attachments';
 import { fromMinor, formatQty, parseMoney } from '@/lib/money';
 
 const UNITS = ['pcs', 'pack', 'box', 'kg', 'g', 'litre', 'ml', 'plate', 'bottle', 'bag'];
@@ -38,7 +38,7 @@ export function ProductForm({ initial }: { initial?: Product }) {
   const [saving, setSaving] = useState(false);
 
   const pickImage = async () => {
-    const picked = await pickAttachmentImage();
+    const picked = await pickOrCaptureAttachmentImage();
     if (picked) setImage(picked.uri);
   };
 

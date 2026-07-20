@@ -1,5 +1,5 @@
 /**
- * Attachment file helpers — pick an image from the library and persist a private
+ * Attachment file helpers — pick or capture an image and persist a private
  * copy that survives cache clears, plus voice-recording persistence and a
  * best-effort file remover.
  *
@@ -20,7 +20,12 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert, Linking } from 'react-native';
 
-import { photosPermissionMessage, confirmPermissionRationale } from '@/lib/permissions';
+import {
+  cameraPermissionMessage,
+  confirmPermissionRationale,
+  photosPermissionMessage,
+  requestCamera,
+} from '@/lib/permissions';
 
 const ATTACHMENTS_DIR = 'attachments';
 
@@ -65,6 +70,18 @@ function extensionFor(source: File, mime: string | null, fallback = '.bin'): str
   return fallback;
 }
 
+/** Copy a picker/camera asset into persistent `attachments/` and return `{ uri, mime }`. */
+async function persistPickedAsset(asset: ImagePicker.ImagePickerAsset): Promise<PickedAttachment> {
+  const mime = asset.mimeType ?? null;
+  const source = new File(asset.uri);
+  const ext = extensionFor(source, mime, '.jpg');
+  const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+  const destination = new File(attachmentsDirectory(), name);
+
+  await source.copy(destination);
+  return { uri: destination.uri, mime: mime ?? (destination.type || null) };
+}
+
 /**
  * Request photo-library permission (with in-app rationale), launch the library
  * picker and copy the chosen image into the persistent `attachments/` directory.
@@ -74,21 +91,26 @@ function extensionFor(source: File, mime: string | null, fallback = '.bin'): str
  * after the rationale we still open the picker even if classic media access is denied.
  */
 export async function pickAttachmentImage(): Promise<PickedAttachment | null> {
-  const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
-  if (!existing.granted) {
-    if (existing.canAskAgain) {
+  // Keep the latest permission status: after requestMediaLibraryPermissionsAsync the
+  // pre-request snapshot is stale (deny → blocked would miss the Settings alert).
+  let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    if (permission.canAskAgain) {
       const ok = await confirmPermissionRationale('photos');
       if (!ok) return null;
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+      permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     }
   }
 
+  // Still open the picker when classic grant is missing — modern Android system
+  // photo picker often works without it. Only guide to Settings when cancelled
+  // and the latest status is blocked.
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     quality: 0.7,
   });
   if (result.canceled || !result.assets?.length) {
-    if (!existing.granted && !existing.canAskAgain) {
+    if (!permission.granted && !permission.canAskAgain) {
       const msg = photosPermissionMessage('blocked');
       Alert.alert(msg.title, msg.message, [
         { text: 'Open Settings', onPress: () => Linking.openSettings().catch(() => {}) },
@@ -98,15 +120,59 @@ export async function pickAttachmentImage(): Promise<PickedAttachment | null> {
     return null;
   }
 
-  const asset = result.assets[0];
-  const mime = asset.mimeType ?? null;
-  const source = new File(asset.uri);
-  const ext = extensionFor(source, mime, '.jpg');
-  const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-  const destination = new File(attachmentsDirectory(), name);
+  return persistPickedAsset(result.assets[0]);
+}
 
-  await source.copy(destination);
-  return { uri: destination.uri, mime: mime ?? (destination.type || null) };
+/**
+ * Request camera permission (with in-app rationale), launch the camera and copy
+ * the captured image into the persistent `attachments/` directory.
+ *
+ * Returns the persisted `{ uri, mime }`, or `null` when the user cancels / declines.
+ */
+export async function captureAttachmentImage(): Promise<PickedAttachment | null> {
+  const outcome = await requestCamera();
+  if (outcome !== 'granted') {
+    if (outcome === 'blocked') {
+      const msg = cameraPermissionMessage('blocked');
+      Alert.alert(msg.title, msg.message, [
+        { text: 'Open Settings', onPress: () => Linking.openSettings().catch(() => {}) },
+        { text: 'OK', style: 'cancel' },
+      ]);
+    }
+    return null;
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ['images'],
+    quality: 0.7,
+  });
+  if (result.canceled || !result.assets?.length) return null;
+
+  return persistPickedAsset(result.assets[0]);
+}
+
+type ImageSourceChoice = 'camera' | 'library' | 'cancel';
+
+/** Present Take photo / Choose from library / Cancel. */
+function chooseImageSource(): Promise<ImageSourceChoice> {
+  return new Promise((resolve) => {
+    Alert.alert('Add photo', 'Take a new picture or choose one you already have.', [
+      { text: 'Take photo', onPress: () => resolve('camera') },
+      { text: 'Choose from library', onPress: () => resolve('library') },
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+    ]);
+  });
+}
+
+/**
+ * Let the user take a photo or pick from the library, then persist into
+ * `attachments/`. Returns `null` when cancelled or permission declined.
+ */
+export async function pickOrCaptureAttachmentImage(): Promise<PickedAttachment | null> {
+  const choice = await chooseImageSource();
+  if (choice === 'cancel') return null;
+  if (choice === 'camera') return captureAttachmentImage();
+  return pickAttachmentImage();
 }
 
 /**

@@ -9,7 +9,15 @@ import { useApp } from '@/context/app-context';
 const ALL_QUICK_ACTION_KEYS = Object.keys(QUICK_ACTION_META) as QuickActionKey[];
 
 /** Universal actions used as a last-resort default so the FAB is never empty. */
-const SAFE_MINIMUM: QuickActionKey[] = ['expense', 'profit'];
+const SAFE_MINIMUM: QuickActionKey[] = ['note', 'expense', 'profit'];
+
+/** Ensure Notes is always among the (up to 4) FAB defaults. */
+function ensureNoteDefault(keys: QuickActionKey[]): QuickActionKey[] {
+  const list = dedupe(keys);
+  if (list.includes('note')) return list.slice(0, 4);
+  if (list.length < 4) return [...list, 'note'];
+  return [...list.slice(0, 3), 'note'];
+}
 
 /**
  * The primary entity each entity screen creates. Defaults for that screen lead
@@ -49,20 +57,20 @@ function resolveDefaultKeys(
 
   if (explicit) {
     const filtered = filterByIndustry(explicit, industry);
-    if (filtered.length) return filtered.slice(0, 4);
+    if (filtered.length) return ensureNoteDefault(filtered);
   } else {
     const lead = SCREEN_PRIMARY[pathname];
     if (lead) {
       const tailored = filterByIndustry(dedupe([lead, ...industry.quickActions]), industry);
-      if (tailored.length) return tailored.slice(0, 4);
+      if (tailored.length) return ensureNoteDefault(tailored);
     } else {
       // Dashboard `/` and any other route: use the industry ordering as-is.
-      if (industryDefaults.length) return industryDefaults.slice(0, 4);
+      if (industryDefaults.length) return ensureNoteDefault(industryDefaults);
     }
   }
 
-  if (industryDefaults.length) return industryDefaults.slice(0, 4);
-  return filterByIndustry(SAFE_MINIMUM, industry);
+  if (industryDefaults.length) return ensureNoteDefault(industryDefaults);
+  return ensureNoteDefault(filterByIndustry(SAFE_MINIMUM, industry));
 }
 
 /**

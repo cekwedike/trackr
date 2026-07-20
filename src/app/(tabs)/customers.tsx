@@ -22,7 +22,7 @@ export default function CustomersScreen() {
   const { money, terms } = useApp();
   const [search, setSearch] = useState('');
   const { data, reload } = useAsyncData(() => listCustomers(), []);
-  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['customer', 'order', 'sale']);
+  const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['customer', 'order', 'sale', 'note']);
   const [importBusy, setImportBusy] = useState(false);
 
   const filtered = (data ?? []).filter(

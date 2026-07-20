@@ -37,6 +37,15 @@ export async function setMarketingIdeaDone(id: number, done: boolean): Promise<v
   ]);
 }
 
+export async function updateMarketingIdea(id: number, title: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE marketing_ideas SET title = ?, updated_at = ? WHERE id = ?', [
+    title.trim(),
+    nowIso(),
+    id,
+  ]);
+}
+
 export async function deleteMarketingIdea(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM marketing_ideas WHERE id = ?', [id]);

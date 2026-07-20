@@ -21,7 +21,11 @@ import type { Attachment } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
 import { persistAudioRecording } from '@/lib/attachments';
 import { toUserMessage } from '@/lib/errors';
-import { microphonePermissionMessage, requestMicrophone } from '@/lib/permissions';
+import {
+  microphonePermissionMessage,
+  openAppPermissionSettings,
+  requestMicrophone,
+} from '@/lib/permissions';
 import { selectionFeedback } from '@/lib/haptics';
 
 const RECORD_OPTS = {
@@ -179,12 +183,17 @@ export function VoiceNoteSection({ noteId }: { noteId: number }) {
     if (busy) return;
     setBusy(true);
     try {
+      // Mic must be granted before setAudioModeAsync / prepare / record.
       const outcome = await requestMicrophone();
       if (outcome !== 'granted') {
         if (outcome === 'blocked') {
           const msg = microphonePermissionMessage(outcome);
-          Alert.alert(msg.title, msg.message);
+          Alert.alert(msg.title, msg.message, [
+            { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
+            { text: 'OK', style: 'cancel' },
+          ]);
         }
+        // `denied` = rationale "Not now" or a one-time OS decline — no second nag.
         return;
       }
       await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
