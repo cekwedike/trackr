@@ -306,7 +306,10 @@ export default function Settings() {
     }
   };
 
-  const doExport = () => setExportPassModal(true);
+  const doExport = () => {
+    if (busy) return;
+    setExportPassModal(true);
+  };
 
   const runExport = async (passphrase: string) => {
     setExportPassModal(false);
@@ -321,6 +324,7 @@ export default function Settings() {
   };
 
   const doImport = async () => {
+    if (busy) return;
     const choice = await confirm({
       title: 'Restore backup',
       message: 'This will REPLACE all current data with the backup file. Continue?',
@@ -331,10 +335,15 @@ export default function Settings() {
     });
     if (choice !== 'restore') return;
 
+    // Keep busy through file pick AND passphrase modal (encrypted path).
+    // Cleared on cancel / non-encrypted completion; held across modal until runEncryptedImport finishes.
     setBusy(true);
     try {
       const picked = await pickBackupFile();
-      if (!picked.picked) return;
+      if (!picked.picked) {
+        setBusy(false);
+        return;
+      }
 
       if (picked.kind === 'encrypted') {
         setPendingImport({ bytes: picked.bytes, kind: 'encrypted' });
@@ -351,14 +360,17 @@ export default function Settings() {
           { label: 'Cancel', style: 'cancel', value: 'cancel' },
         ],
       });
-      if (legacy !== 'ok') return;
+      if (legacy !== 'ok') {
+        setBusy(false);
+        return;
+      }
 
       await importLegacyBackup(picked.bytes, picked.kind);
       await reloadSettings();
       Alert.alert('Restored', 'Your data has been restored.');
+      setBusy(false);
     } catch (e) {
       Alert.alert('Import failed', toUserMessage(e, 'Couldn’t restore that backup. Please try again.'));
-    } finally {
       setBusy(false);
     }
   };
@@ -366,13 +378,15 @@ export default function Settings() {
   const runEncryptedImport = async (passphrase: string) => {
     if (!pendingImport || pendingImport.kind !== 'encrypted') {
       setImportPassModal(false);
+      setBusy(false);
       return;
     }
     setImportPassModal(false);
-    setBusy(true);
+    const bytes = pendingImport.bytes;
+    setPendingImport(null);
+    // busy already true from doImport — keep it through decrypt/import
     try {
-      await importBackupWithPassphrase(pendingImport.bytes, passphrase);
-      setPendingImport(null);
+      await importBackupWithPassphrase(bytes, passphrase);
       await reloadSettings();
       Alert.alert('Restored', 'Your data has been restored.');
     } catch (e) {
@@ -511,7 +525,7 @@ export default function Settings() {
             icon="cloud-download"
             iconTone="warning"
             title="Restore backup"
-            subtitle="Encrypted, or older unprotected zip/JSON"
+            subtitle={busy ? 'Restoring…' : 'Encrypted, or older unprotected zip/JSON'}
             onPress={doImport}
             right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />}
           />
@@ -570,6 +584,7 @@ export default function Settings() {
         onClose={() => {
           setImportPassModal(false);
           setPendingImport(null);
+          setBusy(false);
         }}
         onSubmit={runEncryptedImport}
       />

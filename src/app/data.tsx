@@ -84,6 +84,7 @@ export default function DataScreen() {
   };
 
   const onRestore = async () => {
+    if (busy) return;
     const choice = await confirm({
       title: 'Restore from a backup?',
       message:
@@ -95,9 +96,15 @@ export default function DataScreen() {
     });
     if (choice !== 'ok') return;
 
-    run('restore', async () => {
+    // Keep busy === 'restore' through file pick AND passphrase modal (encrypted path).
+    // Cleared on cancel / non-encrypted completion; held across modal until runEncryptedImport finishes.
+    setBusy('restore');
+    try {
       const picked = await pickBackupFile();
-      if (!picked.picked) return;
+      if (!picked.picked) {
+        setBusy(null);
+        return;
+      }
 
       if (picked.kind === 'encrypted') {
         setPendingImport(picked.bytes);
@@ -114,27 +121,40 @@ export default function DataScreen() {
           { label: 'Cancel', style: 'cancel', value: 'cancel' },
         ],
       });
-      if (legacy !== 'ok') return;
+      if (legacy !== 'ok') {
+        setBusy(null);
+        return;
+      }
 
       const result = await importLegacyBackup(picked.bytes, picked.kind);
       await reloadSettings();
       Alert.alert('Restore complete', `Your data was restored from the backup (${result.tables} tables).`);
-    });
+      setBusy(null);
+    } catch (e) {
+      Alert.alert('Something went wrong', toUserMessage(e));
+      setBusy(null);
+    }
   };
 
-  const runEncryptedImport = (passphrase: string) => {
+  const runEncryptedImport = async (passphrase: string) => {
     if (!pendingImport) {
       setImportPassModal(false);
+      setBusy(null);
       return;
     }
     setImportPassModal(false);
     const bytes = pendingImport;
     setPendingImport(null);
-    run('restore', async () => {
+    // busy already 'restore' from onRestore — keep it through decrypt/import
+    try {
       const result = await importBackupWithPassphrase(bytes, passphrase);
       await reloadSettings();
       Alert.alert('Restore complete', `Your data was restored from the backup (${result.tables} tables).`);
-    });
+    } catch (e) {
+      Alert.alert('Something went wrong', toUserMessage(e));
+    } finally {
+      setBusy(null);
+    }
   };
 
   const onCsv = (action: CsvAction) =>
@@ -297,6 +317,7 @@ export default function DataScreen() {
         onClose={() => {
           setImportPassModal(false);
           setPendingImport(null);
+          setBusy(null);
         }}
         onSubmit={runEncryptedImport}
       />
