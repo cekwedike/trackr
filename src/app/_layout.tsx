@@ -9,7 +9,7 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
@@ -39,7 +39,7 @@ function BrandLoading() {
     opacity: 0.85 + pulse.value * 0.15,
   }));
   return (
-    <View style={{ flex: 1, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', gap: Spacing.xxl }}>
+    <View style={{ flex: 1, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', gap: Spacing.lg }}>
       <Animated.View style={logoStyle}>
         <Image
           source={require('../../assets/images/splash-icon.png')}
@@ -47,7 +47,7 @@ function BrandLoading() {
           contentFit="contain"
         />
       </Animated.View>
-      <ActivityIndicator size="large" color="#FFFFFF" />
+      <Text variant="caption" color="rgba(255,255,255,0.85)">Opening your books…</Text>
     </View>
   );
 }
@@ -75,8 +75,12 @@ function RootNavigator() {
       // Brand-new users land on the welcome/landing screen first; its "Get
       // started" CTA pushes them into the onboarding wizard. We gate purely on
       // `onboarded`, so once the wizard finishes (onboarded === 1) neither the
-      // welcome nor the onboarding screen is ever shown again.
-      if (pathname !== '/welcome' && pathname !== '/onboarding') router.replace('/welcome');
+      // welcome nor the onboarding screen is ever shown again. Legal screens
+      // stay reachable from the welcome footer before onboarding completes.
+      const onLegal = pathname.startsWith('/legal');
+      if (pathname !== '/welcome' && pathname !== '/onboarding' && !onLegal) {
+        router.replace('/welcome');
+      }
       return;
     }
     if (locked) {

@@ -42,6 +42,8 @@ export interface ProfitRecord {
   expenses: number;
   net_profit: number;
   allocation: string; // JSON string of AllocationSlice[]
+  /** 1 = month closed / locked from overwrite. */
+  locked: number;
   created_at: string;
   updated_at: string;
 }
@@ -103,6 +105,8 @@ export interface Customer {
   address: string | null;
   note: string | null;
   debt_balance: number;
+  /** Device contacts id when imported — used for occasional re-sync. */
+  contact_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -136,6 +140,8 @@ export interface Expense {
   description: string | null;
   category: string | null;
   payment_method: string | null;
+  /** Optional VAT/tax percent applied for reporting (0 = none). */
+  tax_rate: number;
   created_at: string;
 }
 
@@ -162,12 +168,16 @@ export interface OrderItem {
   line_total: number;
 }
 
+/** Note content kind — drives editor UX (text / checklist / voice / linked preset). */
+export type NoteType = 'text' | 'checklist' | 'voice' | 'linked';
+
 export interface Note {
   id: number;
   title: string;
   body: string;
   pinned: number;
   color: string | null;
+  note_type: NoteType;
   created_at: string;
   updated_at: string;
 }
@@ -241,12 +251,33 @@ export interface AuditEntry {
   created_at: string;
 }
 
-/** A file/photo attached to a sale or expense. */
+/** A file/photo/audio attached to a sale, expense, or note. */
 export interface Attachment {
   id: number;
-  entity: 'sale' | 'expense';
+  entity: 'sale' | 'expense' | 'note';
   entity_id: number;
   uri: string;
   mime: string | null;
+  duration_ms: number | null;
   created_at: string;
+}
+
+/** Reusable marketing / SMS-style message template (local copy/share). */
+export interface MessageTemplate {
+  id: number;
+  title: string;
+  body: string;
+  category: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Simple promo / campaign checklist item for marketing hub. */
+export interface MarketingIdea {
+  id: number;
+  title: string;
+  done: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }

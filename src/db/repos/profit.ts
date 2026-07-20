@@ -11,24 +11,40 @@ export interface ProfitRecordInput {
   allocation: string; // JSON string of AllocationSlice[]
 }
 
-/** Insert or update (by month) a monthly profit snapshot, preserving created_at. */
+/** Insert or update (by month) a monthly profit snapshot, preserving created_at.
+ *  Refuses to overwrite when the month is locked. */
 export async function upsertProfitRecord(input: ProfitRecordInput): Promise<ProfitRecord> {
   const db = await getDb();
+  const existing = await getProfitRecord(input.month);
+  if (existing?.locked === 1) {
+    throw new Error('This month is locked. Unlock it before saving a new close.');
+  }
   const now = nowIso();
   await db.runAsync(
-    `INSERT INTO profit_records (month, revenue, cogs, expenses, net_profit, allocation, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO profit_records (month, revenue, cogs, expenses, net_profit, allocation, locked, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
      ON CONFLICT(month) DO UPDATE SET
        revenue = excluded.revenue,
        cogs = excluded.cogs,
        expenses = excluded.expenses,
        net_profit = excluded.net_profit,
        allocation = excluded.allocation,
-       updated_at = excluded.updated_at`,
+       updated_at = excluded.updated_at
+     WHERE profit_records.locked = 0`,
     [input.month, input.revenue, input.cogs, input.expenses, input.net_profit, input.allocation, now, now],
   );
   const row = await getProfitRecord(input.month);
   return row!;
+}
+
+/** Lock (close) a month so the snapshot cannot be overwritten until unlocked. */
+export async function setProfitRecordLocked(month: string, locked: boolean): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE profit_records SET locked = ?, updated_at = ? WHERE month = ?', [
+    locked ? 1 : 0,
+    nowIso(),
+    month,
+  ]);
 }
 
 /** All saved monthly records, most recent month first. */

@@ -9,6 +9,8 @@ export interface ExpenseInput {
   description?: string | null;
   category?: string | null;
   payment_method?: string | null;
+  /** Optional VAT/tax percent (e.g. 7.5). Stored for reporting; amount stays tax-inclusive cash. */
+  tax_rate?: number | null;
 }
 
 export const EXPENSE_CATEGORIES = [
@@ -37,9 +39,17 @@ export async function getExpense(id: number): Promise<Expense | null> {
 export async function createExpense(input: ExpenseInput): Promise<number> {
   const db = await getDb();
   const res = await db.runAsync(
-    `INSERT INTO expenses (occurred_at, amount, description, category, payment_method, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [input.occurred_at, input.amount, input.description ?? null, input.category ?? null, input.payment_method ?? null, nowIso()],
+    `INSERT INTO expenses (occurred_at, amount, description, category, payment_method, tax_rate, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.occurred_at,
+      input.amount,
+      input.description ?? null,
+      input.category ?? null,
+      input.payment_method ?? null,
+      input.tax_rate ?? 0,
+      nowIso(),
+    ],
   );
   await logAudit('expense', res.lastInsertRowId, 'create', `Recorded expense of ${await auditMoney(input.amount)}`);
   return res.lastInsertRowId;
@@ -48,8 +58,16 @@ export async function createExpense(input: ExpenseInput): Promise<number> {
 export async function updateExpense(id: number, input: ExpenseInput): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE expenses SET occurred_at = ?, amount = ?, description = ?, category = ?, payment_method = ? WHERE id = ?`,
-    [input.occurred_at, input.amount, input.description ?? null, input.category ?? null, input.payment_method ?? null, id],
+    `UPDATE expenses SET occurred_at = ?, amount = ?, description = ?, category = ?, payment_method = ?, tax_rate = ? WHERE id = ?`,
+    [
+      input.occurred_at,
+      input.amount,
+      input.description ?? null,
+      input.category ?? null,
+      input.payment_method ?? null,
+      input.tax_rate ?? 0,
+      id,
+    ],
   );
   await logAudit('expense', id, 'update', `Updated expense to ${await auditMoney(input.amount)}`);
 }

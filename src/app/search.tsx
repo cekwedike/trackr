@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
 import { FadeSlide } from '@/components/anim';
 import { AppHeader, Card, EmptyState, IconButton, ListRow, Screen, SectionHeader, Text, TextField, type IconName } from '@/components/ui';
@@ -235,7 +235,7 @@ export default function SearchScreen() {
             // Keep the clear (×) button mounted and tappable even while a search
             // is in flight — show the spinner beside it, never in place of it.
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-              {searching ? <ActivityIndicator size="small" color={t.textMuted} /> : null}
+              {searching ? <Text variant="caption" color={t.textMuted}>Searching…</Text> : null}
               <IconButton icon="close-circle" size={18} color={t.textMuted} onPress={clear} />
             </View>
           ) : (

@@ -1,13 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { useConfirm } from '@/components/confirm';
 import { useUndo } from '@/components/undo';
+import { ChecklistEditor } from '@/components/notes/checklist-editor';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { ENTITY_ROUTE, entityMeta } from '@/components/notes/entities';
+import { NoteTypePicker, NOTE_TYPE_META } from '@/components/notes/note-type-picker';
 import { useNoteColorTokens } from '@/components/notes/palette';
+import { VoiceNoteSection } from '@/components/notes/voice-recorder';
 import { SelectModal, type SelectOption } from '@/components/pickers';
 import { AppHeader, Card, IconButton, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -24,7 +27,7 @@ import {
   togglePinned,
   updateNote,
 } from '@/db/repos/notes';
-import type { LinkTargetType } from '@/db/types';
+import type { LinkTargetType, NoteType } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -39,8 +42,10 @@ export default function NoteEditor() {
   const [body, setBody] = useState('');
   const [pinned, setPinned] = useState(false);
   const [color, setColor] = useState<string | null>(null);
+  const [noteType, setNoteType] = useState<NoteType>('text');
   const loadedFor = useRef<number | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openAttachOnce = useRef(false);
 
   const [typeModal, setTypeModal] = useState(false);
   const [entityModal, setEntityModal] = useState<LinkTargetType | null>(null);
@@ -61,7 +66,12 @@ export default function NoteEditor() {
       setBody(data.note.body);
       setPinned(data.note.pinned === 1);
       setColor(data.note.color);
+      setNoteType(data.note.note_type ?? 'text');
       loadedFor.current = data.note.id;
+      if ((data.note.note_type ?? 'text') === 'linked' && !openAttachOnce.current) {
+        openAttachOnce.current = true;
+        setTypeModal(true);
+      }
     }
   }, [data]);
 
@@ -69,14 +79,28 @@ export default function NoteEditor() {
     if (loadedFor.current !== noteId) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await updateNote(noteId, { title: title || 'Untitled', body, pinned: pinned ? 1 : 0, color });
+      await updateNote(noteId, {
+        title: title || 'Untitled',
+        body,
+        pinned: pinned ? 1 : 0,
+        color,
+        note_type: noteType,
+      });
       reload();
     }, 600);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, body, pinned, color]);
+  }, [title, body, pinned, color, noteType]);
+
+  const changeType = (next: NoteType) => {
+    if (next === 'checklist' && noteType !== 'checklist' && !body.includes('[')) {
+      setBody(body.trim() ? body.split('\n').map((l) => `[ ] ${l}`).join('\n') : '[ ] ');
+    }
+    setNoteType(next);
+    if (next === 'linked') setTypeModal(true);
+  };
 
   const remove = async () => {
     const choice = await confirm({
@@ -88,8 +112,6 @@ export default function NoteEditor() {
       ],
     });
     if (choice === 'delete') {
-      // Snapshot the note's content before deleting. UNDO re-creates the note
-      // (new id). Best-effort: outgoing/entity links are not restored.
       const snap = data?.note;
       await deleteNote(noteId);
       router.back();
@@ -102,6 +124,7 @@ export default function NoteEditor() {
               body: snap.body,
               pinned: snap.pinned,
               color: snap.color,
+              note_type: snap.note_type ?? 'text',
             }),
         });
       }
@@ -114,9 +137,16 @@ export default function NoteEditor() {
     if (linkType === 'product') {
       options = (await listProducts()).map((p) => ({ id: String(p.id), label: p.name }));
     } else if (linkType === 'customer') {
-      options = (await listCustomers()).map((c) => ({ id: String(c.id), label: c.name, sublabel: c.phone ?? undefined }));
+      options = (await listCustomers()).map((c) => ({
+        id: String(c.id),
+        label: c.name,
+        sublabel: c.phone ?? undefined,
+      }));
     } else if (linkType === 'order') {
-      options = (await listOrders()).map((o) => ({ id: String(o.id), label: o.customer_name || `Order #${o.id}` }));
+      options = (await listOrders()).map((o) => ({
+        id: String(o.id),
+        label: o.customer_name || `Order #${o.id}`,
+      }));
     }
     setEntityOptions(options);
     setEntityModal(linkType);
@@ -140,34 +170,67 @@ export default function NoteEditor() {
   }
 
   const attached = data?.outgoing.filter((l) => l.target_type !== 'note') ?? [];
+  const typeMeta = NOTE_TYPE_META[noteType];
 
   return (
     <Screen style={{ backgroundColor: tokens.isDefault ? t.background : tokens.bg }}>
       <AppHeader
-        title="Note"
+        title={typeMeta.label}
         back
         right={
           <View style={{ flexDirection: 'row' }}>
             <IconButton
               icon={pinned ? 'bookmark' : 'bookmark-outline'}
               color={pinned ? tokens.accent : undefined}
-              onPress={() => { setPinned((v) => !v); togglePinned(noteId, !pinned); }}
+              onPress={() => {
+                setPinned((v) => !v);
+                togglePinned(noteId, !pinned);
+              }}
             />
             <IconButton icon="trash-outline" tone="danger" onPress={remove} />
           </View>
         }
       />
 
-      <Card style={{ gap: Spacing.sm, marginBottom: Spacing.lg, backgroundColor: tokens.bg, borderColor: tokens.border }}>
+      <SectionHeader title="Note type" />
+      <Card style={{ marginBottom: Spacing.lg }}>
+        <NoteTypePicker value={noteType} onChange={changeType} />
+      </Card>
+
+      <Card
+        style={{
+          gap: Spacing.sm,
+          marginBottom: Spacing.lg,
+          backgroundColor: tokens.bg,
+          borderColor: tokens.border,
+        }}
+      >
         <TextField value={title} onChangeText={setTitle} placeholder="Note title" />
-        <TextField
-          value={body}
-          onChangeText={setBody}
-          placeholder="Start writing — ideas, supplier details, to-dos, anything…"
-          multiline
-          style={{ minHeight: 220 }}
-        />
-        <Text variant="caption" color={t.textMuted}>Saved automatically</Text>
+        {noteType === 'checklist' ? (
+          <ChecklistEditor value={body} onChange={setBody} />
+        ) : noteType === 'voice' ? (
+          <>
+            <TextField
+              value={body}
+              onChangeText={setBody}
+              placeholder="Optional caption…"
+              multiline
+              style={{ minHeight: 72 }}
+            />
+            <VoiceNoteSection noteId={noteId} />
+          </>
+        ) : (
+          <TextField
+            value={body}
+            onChangeText={setBody}
+            placeholder="Start writing — ideas, supplier details, to-dos, anything…"
+            multiline
+            style={{ minHeight: 220 }}
+          />
+        )}
+        <Text variant="caption" color={t.textMuted}>
+          Saved automatically
+        </Text>
       </Card>
 
       <SectionHeader title="Color theme" />
@@ -180,10 +243,17 @@ export default function NoteEditor() {
         {attached.length === 0 ? (
           <Pressable
             onPress={() => setTypeModal(true)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: Spacing.sm,
+              paddingVertical: Spacing.sm,
+            }}
           >
             <Ionicons name="add-circle-outline" size={20} color={t.primary} />
-            <Text variant="body" color={t.textSecondary}>Link this note to a customer, product or order</Text>
+            <Text variant="body" color={t.textSecondary}>
+              Link this note to a customer, product or order
+            </Text>
           </Pressable>
         ) : (
           attached.map((l) => {
@@ -191,18 +261,40 @@ export default function NoteEditor() {
             return (
               <View key={l.id} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
                 <Pressable
-                  onPress={() => l.target_id && router.push(`${ENTITY_ROUTE[l.target_type]}/${l.target_id}` as Href)}
+                  onPress={() =>
+                    l.target_id && router.push(`${ENTITY_ROUTE[l.target_type]}/${l.target_id}` as Href)
+                  }
                   style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1 }}
                 >
-                  <View style={{ width: 38, height: 38, borderRadius: Radius.md, backgroundColor: t.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: Radius.md,
+                      backgroundColor: t.primarySoft,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
                     <Ionicons name={meta.icon} size={18} color={t.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text variant="body" weight="semibold" numberOfLines={1}>{l.target_title}</Text>
-                    <Text variant="caption" color={t.textSecondary}>{meta.label}</Text>
+                    <Text variant="body" weight="semibold" numberOfLines={1}>
+                      {l.target_title}
+                    </Text>
+                    <Text variant="caption" color={t.textSecondary}>
+                      {meta.label}
+                    </Text>
                   </View>
                 </Pressable>
-                <IconButton icon="close" size={18} onPress={async () => { await removeLink(l.id); reload(); }} />
+                <IconButton
+                  icon="close"
+                  size={18}
+                  onPress={async () => {
+                    await removeLink(l.id);
+                    reload();
+                  }}
+                />
               </View>
             );
           })

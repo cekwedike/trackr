@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
@@ -70,6 +70,8 @@ export default function OrdersScreen() {
             message={`Track ${terms.customer.toLowerCase()} ${terms.orders.toLowerCase()} from request to delivery.`}
             actionLabel={`New ${terms.order.toLowerCase()}`}
             onAction={() => router.push('/orders/new')}
+            secondaryLabel="Operations hub"
+            onSecondary={() => router.push('/operations' as Href)}
           />
         )}
       </Screen>

@@ -32,6 +32,7 @@ export default function More() {
     const g: { title: string; items: Item[] }[] = [];
 
     const money: Item[] = [];
+    money.push({ icon: 'briefcase', tone: 'primary', title: 'Accounting', subtitle: 'Cash P&L, categories & books', href: '/accounting' as Href });
     if (modules.sales) money.push({ icon: 'cart', tone: 'success', title: `${terms.sales} history`, subtitle: `All recorded ${terms.sales.toLowerCase()}`, href: '/sales' });
     money.push({ icon: 'wallet', tone: 'danger', title: 'Expenses', subtitle: 'Track what you spend', href: '/expenses' });
     money.push({ icon: 'repeat', tone: 'warning', title: 'Recurring expenses', subtitle: 'Auto-log bills on a schedule', href: '/recurring' as Href });
@@ -40,6 +41,14 @@ export default function More() {
     money.push({ icon: 'stats-chart', tone: 'primary', title: 'Reports', subtitle: 'Charts, trends & top lists', href: '/reports' as Href });
     money.push({ icon: 'cash', tone: 'warning', title: 'Receivables', subtitle: 'See who owes you money', href: '/debtors' as Href });
     g.push({ title: 'Money', items: money });
+
+    g.push({
+      title: 'Grow & run',
+      items: [
+        { icon: 'megaphone', tone: 'accent', title: 'Marketing', subtitle: 'Templates, birthdays & promo checklist', href: '/marketing' as Href },
+        { icon: 'construct', tone: 'info', title: 'Operations', subtitle: 'Pipeline, restock, reminders & export', href: '/operations' as Href },
+      ],
+    });
 
     const rel: Item[] = [];
     if (modules.customers) rel.push({ icon: 'people', tone: 'info', title: terms.customers, subtitle: `Contacts, birthdays, debts`, href: '/customers' });
@@ -99,6 +108,8 @@ export default function More() {
               <ListRow icon="cloud-upload" iconTone="success" title="Data & backup" subtitle="Export, restore & sample data" onPress={() => router.push('/data' as Href)} right={<Chevron />} />
               <View style={{ height: 1, backgroundColor: t.border }} />
               <ListRow icon="settings" iconTone="primary" title="Settings" subtitle="Business, currency, security, backup" onPress={() => router.push('/settings')} right={<Chevron />} />
+              <View style={{ height: 1, backgroundColor: t.border }} />
+              <ListRow icon="shield-checkmark" iconTone="info" title="Legal" subtitle="Privacy, Terms & Offline notice" onPress={() => router.push('/legal/privacy' as Href)} right={<Chevron />} />
             </Card>
             <Text variant="caption" color={t.textMuted} style={{ textAlign: 'center' }}>Trackr v1.0.0</Text>
           </ScrollView>
@@ -131,6 +142,8 @@ export default function More() {
         <ListRow icon="cloud-upload" iconTone="success" title="Data & backup" subtitle="Export, restore & sample data" onPress={() => router.push('/data' as Href)} right={<Chevron />} />
         <View style={{ height: 1, backgroundColor: t.border }} />
         <ListRow icon="settings" iconTone="primary" title="Settings" subtitle="Business, currency, security, backup" onPress={() => router.push('/settings')} right={<Chevron />} />
+        <View style={{ height: 1, backgroundColor: t.border }} />
+        <ListRow icon="shield-checkmark" iconTone="info" title="Legal" subtitle="Privacy, Terms & Offline notice" onPress={() => router.push('/legal/privacy' as Href)} right={<Chevron />} />
       </Card>
 
       <Text variant="caption" color={t.textMuted} style={{ textAlign: 'center', marginTop: Spacing.xl }}>

@@ -73,6 +73,7 @@ export async function recordDebtPayment(
     ]);
   });
   await logAudit('payment', customerId, 'create', `Recorded debt payment of ${await auditMoney(Math.round(amount))}`);
+  void import('@/lib/event-notifications').then((m) => m.syncPaymentsNudge()).catch(() => {});
   const updated = await db.getFirstAsync<{ debt_balance: number }>(
     'SELECT debt_balance FROM customers WHERE id = ?',
     [customerId],

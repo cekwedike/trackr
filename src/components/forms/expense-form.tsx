@@ -22,6 +22,7 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
   const [description, setDescription] = useState(initial?.description ?? '');
   const [category, setCategory] = useState(initial?.category ?? '');
   const [payment, setPayment] = useState(initial?.payment_method ?? 'Cash');
+  const [taxRate, setTaxRate] = useState(initial?.tax_rate ? String(initial.tax_rate) : '');
   const [date, setDate] = useState(initial ? new Date(initial.occurred_at) : new Date());
   const [catModal, setCatModal] = useState(false);
   const [payModal, setPayModal] = useState(false);
@@ -33,6 +34,11 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
       Alert.alert('Enter amount', 'Please enter a valid expense amount.');
       return;
     }
+    const tax = parseFloat(taxRate.replace(',', '.')) || 0;
+    if (tax < 0 || tax > 100) {
+      Alert.alert('Check tax rate', 'Tax / VAT should be between 0 and 100%.');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -41,6 +47,7 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
         description: description.trim() || null,
         category: category || null,
         payment_method: payment,
+        tax_rate: tax,
       };
       if (initial) await updateExpense(initial.id, payload);
       else await createExpense(payload);
@@ -75,6 +82,7 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
             description: snap.description,
             category: snap.category,
             payment_method: snap.payment_method,
+            tax_rate: snap.tax_rate,
           }),
       });
     }
@@ -88,6 +96,13 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
         <TextField label="Description" value={description} onChangeText={setDescription} placeholder="What was it for?" />
         <SelectField label="Category" value={category} placeholder="Select category" onPress={() => setCatModal(true)} />
         <SelectField label="Payment method" value={payment} onPress={() => setPayModal(true)} />
+        <TextField
+          label="Tax / VAT % (optional)"
+          value={taxRate}
+          onChangeText={setTaxRate}
+          keyboardType="numeric"
+          placeholder="0"
+        />
         <DateTimeField label="Date" value={date} onChange={setDate} mode="date" />
       </Card>
 

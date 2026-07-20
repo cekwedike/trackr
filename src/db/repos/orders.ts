@@ -82,6 +82,16 @@ export async function createOrder(input: OrderInput): Promise<number> {
     'create',
     `Created order${input.customer_name ? ` for "${input.customer_name}"` : ''} of ${await auditMoney(total)}`,
   );
+  void import('@/lib/event-notifications')
+    .then((m) =>
+      m.scheduleOrderDueNotification({
+        id: orderId,
+        customer_name: input.customer_name,
+        status: input.status,
+        due_at: input.due_at,
+      }),
+    )
+    .catch(() => {});
   return orderId;
 }
 
@@ -118,6 +128,16 @@ export async function updateOrder(id: number, input: OrderInput): Promise<void> 
     'update',
     `Updated order${input.customer_name ? ` for "${input.customer_name}"` : ''} to ${await auditMoney(total)}`,
   );
+  void import('@/lib/event-notifications')
+    .then((m) =>
+      m.scheduleOrderDueNotification({
+        id,
+        customer_name: input.customer_name,
+        status: input.status,
+        due_at: input.due_at,
+      }),
+    )
+    .catch(() => {});
 }
 
 export async function setOrderStatus(id: number, status: OrderStatus): Promise<void> {
@@ -125,12 +145,19 @@ export async function setOrderStatus(id: number, status: OrderStatus): Promise<v
   await db.runAsync('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [status, nowIso(), id]);
   const label = ORDER_STATUSES.find((s) => s.value === status)?.label ?? status;
   await logAudit('order', id, 'update', `Set order status to ${label}`);
+  void import('@/lib/event-notifications')
+    .then(async (m) => {
+      const order = await getOrder(id);
+      if (order) await m.scheduleOrderDueNotification(order);
+    })
+    .catch(() => {});
 }
 
 export async function deleteOrder(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync('DELETE FROM orders WHERE id = ?', [id]);
   await logAudit('order', id, 'delete', 'Deleted order');
+  void import('@/lib/event-notifications').then((m) => m.cancelOrderDueNotification(id)).catch(() => {});
 }
 
 /** Lightweight row for global search results. */

@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   LayoutChangeEvent,
   Pressable,
   ScrollView,
@@ -239,7 +238,7 @@ export function Screen({
               onScroll={scrollHandler}
               scrollEventThrottle={16}
               bottomOffset={24}
-              contentContainerStyle={[{ paddingBottom: Spacing.xxxl * 2, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, contentStyle]}
+              contentContainerStyle={[{ flexGrow: 1, paddingBottom: Spacing.xxxl * 2, paddingHorizontal: hPad, paddingTop: padded ? Spacing.md : 0 }, contentStyle]}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
@@ -321,7 +320,7 @@ export function Button({
       onPress={onPress}
       disabled={disabled || loading}
       scaleTo={PressScale.button}
-      haptic={filled}
+      haptic
       style={[
         {
           height: heights[size],
@@ -348,7 +347,9 @@ export function Button({
         />
       ) : null}
       {loading ? (
-        <ActivityIndicator color={fg} />
+        <RNText style={{ color: fg, fontWeight: FontWeight.semibold, fontSize: size === 'sm' ? FontSize.sm : FontSize.md }}>
+          {title.endsWith('…') || title.endsWith('...') ? title : `${title}…`}
+        </RNText>
       ) : (
         <>
           {icon && <Ionicons name={icon} size={size === 'sm' ? 16 : 18} color={fg} />}
@@ -855,7 +856,17 @@ export function EmptyState({
   const t = useTheme();
   const { accent } = useApp();
   return (
-    <FadeSlide style={{ alignItems: 'center', paddingVertical: Spacing.xxxl, paddingHorizontal: Spacing.lg }}>
+    <FadeSlide
+      style={{
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: Spacing.xxxl,
+        paddingHorizontal: Spacing.lg,
+        minHeight: 320,
+        flexGrow: 1,
+      }}
+    >
       {/* Layered medallion: soft outer halo + tinted inner disc for a designed, branded feel */}
       <View
         style={{
@@ -888,7 +899,12 @@ export function EmptyState({
         </Text>
       ) : null}
       {actionLabel && onAction ? (
-        <Button title={actionLabel} onPress={onAction} icon={actionIcon} style={{ marginTop: Spacing.xl, alignSelf: 'stretch', maxWidth: 300 }} />
+        <Button
+          title={actionLabel}
+          onPress={onAction}
+          icon={actionIcon}
+          style={{ marginTop: Spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 300 }}
+        />
       ) : null}
       {secondaryLabel && onSecondary ? (
         <Pressable onPress={onSecondary} hitSlop={8} style={{ marginTop: Spacing.md }}>

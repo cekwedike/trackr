@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { View } from 'react-native';
 
 import { AppHeader, CardList, Chip, EmptyState, FAB, ListRow, Screen, Text } from '@/components/ui';
@@ -39,7 +39,15 @@ export default function ExpensesScreen() {
             )}
           />
         ) : (
-          <EmptyState icon="wallet-outline" title="No expenses yet" message="Log what you spend to see true profit." actionLabel="Add expense" onAction={() => router.push('/expenses/new')} />
+          <EmptyState
+            icon="wallet-outline"
+            title="No expenses yet"
+            message="Log what you spend to see true profit."
+            actionLabel="Add expense"
+            onAction={() => router.push('/expenses/new')}
+            secondaryLabel="Open accounting"
+            onSecondary={() => router.push('/accounting' as Href)}
+          />
         )}
       </Screen>
       <FAB label="Expense" onPress={() => router.push('/expenses/new')} />

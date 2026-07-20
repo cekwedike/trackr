@@ -361,6 +361,10 @@ function buildFaqs(terms: IndustryTerms): FaqCategory[] {
           q: 'Still stuck?',
           a: 'Export a backup to keep your data safe, then try closing and reopening Trackr. Most hiccups clear with a fresh start — and your offline data stays put.',
         },
+        {
+          q: 'Where are Privacy and Terms?',
+          a: 'Open Settings → About, or More → Legal. The in-app Privacy Policy, Terms of Use, and Offline & Data notice are drafts for product use — have a lawyer review them before submitting Trackr to the App Store or Play Store.',
+        },
       ],
     },
   ];

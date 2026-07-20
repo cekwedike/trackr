@@ -12,6 +12,10 @@ import { useApp } from '@/context/app-context';
 import { createCustomer, deleteCustomer, updateCustomer } from '@/db/repos/customers';
 import type { Customer } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  cancelBirthdayNotification,
+  scheduleBirthdayNotification,
+} from '@/lib/birthday-notifications';
 import { fromMinor, parseMoney } from '@/lib/money';
 
 export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?: () => void }) {
@@ -44,9 +48,18 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
         address: address.trim() || null,
         note: note.trim() || null,
         debt_balance: parseMoney(debt),
+        contact_id: initial?.contact_id ?? null,
       };
+      let id = initial?.id;
       if (initial) await updateCustomer(initial.id, payload);
-      else await createCustomer(payload);
+      else id = await createCustomer(payload);
+      if (id != null) {
+        if (payload.birthday) {
+          await scheduleBirthdayNotification({ id, name: payload.name, birthday: payload.birthday });
+        } else {
+          await cancelBirthdayNotification(id);
+        }
+      }
       if (onDone) onDone();
       else router.back();
     } finally {
@@ -71,11 +84,12 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
       // but the outstanding debt_balance is preserved on the re-created record.
       const snap = initial;
       await deleteCustomer(snap.id);
+      await cancelBirthdayNotification(snap.id);
       router.back();
       showUndo({
         message: `Deleted ${label}`,
-        onUndo: () =>
-          createCustomer({
+        onUndo: async () => {
+          const id = await createCustomer({
             name: snap.name,
             phone: snap.phone,
             email: snap.email,
@@ -83,7 +97,12 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
             address: snap.address,
             note: snap.note,
             debt_balance: snap.debt_balance,
-          }),
+            contact_id: snap.contact_id,
+          });
+          if (snap.birthday) {
+            await scheduleBirthdayNotification({ id, name: snap.name, birthday: snap.birthday });
+          }
+        },
       });
     }
   };

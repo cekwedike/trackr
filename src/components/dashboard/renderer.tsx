@@ -1,14 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Pressable, View } from 'react-native';
 
 import { Entrance } from '@/components/anim';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { WIDGET_COMPONENTS, type WidgetProps } from '@/components/dashboard/widgets';
+import { Text } from '@/components/ui';
 import type { WidgetKey } from '@/constants/industries';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { visibleWidgets } from '@/lib/dashboard-visibility';
 
 export function DashboardRenderer({ widgets, ...props }: { widgets: WidgetKey[] } & WidgetProps) {
+  const t = useTheme();
+  const [showAll, setShowAll] = useState(false);
+  const { visible, hiddenCount } = visibleWidgets(widgets, props.data, showAll);
+  const canCollapse = showAll && widgets.some((k) => k !== 'hero' && k !== 'quickActions');
+
   return (
     <>
-      {widgets.map((key, i) => {
+      {visible.map((key, i) => {
         const Widget = WIDGET_COMPONENTS[key];
         if (!Widget) return null;
         return (
@@ -19,6 +29,21 @@ export function DashboardRenderer({ widgets, ...props }: { widgets: WidgetKey[] 
           </Entrance>
         );
       })}
+
+      {hiddenCount > 0 || canCollapse ? (
+        <View style={{ alignItems: 'center', marginBottom: Spacing.xl, paddingTop: Spacing.xs }}>
+          <Pressable
+            onPress={() => setShowAll((v) => !v)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={showAll ? 'Show fewer insights' : 'Show more insights'}
+          >
+            <Text variant="label" color={t.primary}>
+              {showAll ? 'Show fewer insights' : `Show more insights${hiddenCount > 0 ? ` (${hiddenCount})` : ''}`}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </>
   );
 }

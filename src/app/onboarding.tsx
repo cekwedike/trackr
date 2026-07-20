@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
@@ -27,6 +28,7 @@ import { PermissionRationale, requestNotifications, type PermissionOutcome } fro
 
 export default function Onboarding() {
   const t = useTheme();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const hPad = width >= 480 ? Spacing.xl : Spacing.lg;
@@ -327,29 +329,57 @@ export default function Onboarding() {
             {step === 4 && error ? <Text variant="caption" color={t.danger}>{error}</Text> : null}
 
             {step === 0 ? (
-              <Button title="Continue" icon="arrow-forward" onPress={() => setStep(1)} />
+              <View style={{ gap: Spacing.sm }}>
+                <Button title="Continue" icon="arrow-forward" size="lg" onPress={() => setStep(1)} />
+                <Text variant="caption" color={t.textMuted} style={{ textAlign: 'center', lineHeight: 18 }}>
+                  By continuing you agree to our Terms and Privacy Policy.
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg }}>
+                  <Pressable
+                    accessibilityRole="link"
+                    accessibilityLabel="Terms of Use"
+                    onPress={() => router.push('/legal/terms' as Href)}
+                    hitSlop={8}
+                  >
+                    <Text variant="caption" color={t.primary} weight="semibold" style={{ textDecorationLine: 'underline' }}>
+                      Terms
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="link"
+                    accessibilityLabel="Privacy Policy"
+                    onPress={() => router.push('/legal/privacy' as Href)}
+                    hitSlop={8}
+                  >
+                    <Text variant="caption" color={t.primary} weight="semibold" style={{ textDecorationLine: 'underline' }}>
+                      Privacy Policy
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
             ) : null}
 
             {step === 1 ? (
               <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-                <Button title="Back" variant="ghost" onPress={() => setStep(0)} style={{ flex: 1 }} />
-                <Button title="Continue" icon="arrow-forward" onPress={() => setStep(2)} style={{ flex: 1 }} />
+                <Button title="Back" variant="ghost" size="lg" onPress={() => setStep(0)} style={{ flex: 1 }} />
+                <Button title="Continue" icon="arrow-forward" size="lg" onPress={() => setStep(2)} style={{ flex: 1 }} />
               </View>
             ) : null}
 
             {step === 2 ? (
               <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-                <Button title="Back" variant="ghost" onPress={() => setStep(1)} style={{ flex: 1 }} />
-                <Button title="Continue" icon="arrow-forward" onPress={() => setStep(3)} style={{ flex: 1 }} />
+                <Button title="Back" variant="ghost" size="lg" onPress={() => setStep(1)} style={{ flex: 1 }} />
+                <Button title="Continue" icon="arrow-forward" size="lg" onPress={() => setStep(3)} style={{ flex: 1 }} />
               </View>
             ) : null}
 
             {step === 3 ? (
               <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-                <Button title="Back" variant="ghost" onPress={() => setStep(2)} style={{ flex: 1 }} />
+                <Button title="Back" variant="ghost" size="lg" onPress={() => setStep(2)} style={{ flex: 1 }} />
                 <Button
                   title={notifOutcome === 'granted' ? 'Continue' : 'Skip for now'}
                   icon="arrow-forward"
+                  size="lg"
                   variant={notifOutcome === 'granted' ? 'primary' : 'secondary'}
                   onPress={() => setStep(4)}
                   style={{ flex: 1 }}
@@ -359,8 +389,8 @@ export default function Onboarding() {
 
             {step === 4 ? (
               <View style={{ flexDirection: 'row', gap: Spacing.md }}>
-                <Button title="Back" variant="ghost" onPress={() => setStep(3)} style={{ flex: 1 }} />
-                <Button title="Finish" icon="checkmark" onPress={finish} loading={saving} style={{ flex: 1 }} />
+                <Button title="Back" variant="ghost" size="lg" onPress={() => setStep(3)} style={{ flex: 1 }} />
+                <Button title="Finish" icon="checkmark" size="lg" onPress={finish} loading={saving} style={{ flex: 1 }} />
               </View>
             ) : null}
           </View>

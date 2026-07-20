@@ -11,6 +11,7 @@ export interface CustomerInput {
   address?: string | null;
   note?: string | null;
   debt_balance?: number;
+  contact_id?: string | null;
 }
 
 export async function listCustomers(): Promise<Customer[]> {
@@ -27,8 +28,8 @@ export async function createCustomer(input: CustomerInput): Promise<number> {
   const db = await getDb();
   const now = nowIso();
   const res = await db.runAsync(
-    `INSERT INTO customers (name, phone, email, birthday, address, note, debt_balance, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO customers (name, phone, email, birthday, address, note, debt_balance, contact_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.name,
       input.phone ?? null,
@@ -37,6 +38,7 @@ export async function createCustomer(input: CustomerInput): Promise<number> {
       input.address ?? null,
       input.note ?? null,
       input.debt_balance ?? 0,
+      input.contact_id ?? null,
       now,
       now,
     ],
@@ -48,7 +50,7 @@ export async function createCustomer(input: CustomerInput): Promise<number> {
 export async function updateCustomer(id: number, input: CustomerInput): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE customers SET name = ?, phone = ?, email = ?, birthday = ?, address = ?, note = ?, debt_balance = ?, updated_at = ? WHERE id = ?`,
+    `UPDATE customers SET name = ?, phone = ?, email = ?, birthday = ?, address = ?, note = ?, debt_balance = ?, contact_id = ?, updated_at = ? WHERE id = ?`,
     [
       input.name,
       input.phone ?? null,
@@ -57,11 +59,26 @@ export async function updateCustomer(id: number, input: CustomerInput): Promise<
       input.address ?? null,
       input.note ?? null,
       input.debt_balance ?? 0,
+      input.contact_id ?? null,
       nowIso(),
       id,
     ],
   );
   await logAudit('customer', id, 'update', `Updated customer "${input.name}"`);
+}
+
+/** Find a customer previously imported from a device contact. */
+export async function findCustomerByContactId(contactId: string): Promise<Customer | null> {
+  const db = await getDb();
+  return db.getFirstAsync<Customer>('SELECT * FROM customers WHERE contact_id = ? LIMIT 1', [contactId]);
+}
+
+/** Find by normalised phone digits (for re-sync when contact_id is missing). */
+export async function findCustomerByPhoneDigits(digits: string): Promise<Customer | null> {
+  if (!digits) return null;
+  const db = await getDb();
+  const rows = await db.getAllAsync<Customer>('SELECT * FROM customers WHERE phone IS NOT NULL');
+  return rows.find((c) => (c.phone ?? '').replace(/\D/g, '') === digits) ?? null;
 }
 
 export async function adjustDebt(id: number, delta: number): Promise<void> {
@@ -71,6 +88,7 @@ export async function adjustDebt(id: number, delta: number): Promise<void> {
     nowIso(),
     id,
   ]);
+  void import('@/lib/event-notifications').then((m) => m.syncPaymentsNudge()).catch(() => {});
 }
 
 export async function deleteCustomer(id: number): Promise<void> {

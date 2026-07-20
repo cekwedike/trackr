@@ -6,11 +6,13 @@ import { Pressable, useWindowDimensions, View } from 'react-native';
 import { Entrance } from '@/components/anim';
 import { ENTITY_ROUTE, entityMeta } from '@/components/notes/entities';
 import { NoteCard, NoteListRow } from '@/components/notes/note-card';
+import { NOTE_TYPE_META } from '@/components/notes/note-type-picker';
 import { ViewSwitcher, type NotesView } from '@/components/notes/view-switcher';
+import { SelectModal } from '@/components/pickers';
 import { AppHeader, Card, EmptyState, FAB, Screen, Text, TextField, type IconName } from '@/components/ui';
 import { FontWeight, Radius, Spacing } from '@/constants/theme';
 import { createNote, listNoteEntityLinks, listNotes, togglePinned, type NoteEntityLink } from '@/db/repos/notes';
-import type { LinkTargetType, Note } from '@/db/types';
+import type { LinkTargetType, Note, NoteType } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -19,6 +21,7 @@ export default function NotesScreen() {
   const { width } = useWindowDimensions();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<NotesView>('card');
+  const [typePicker, setTypePicker] = useState(false);
 
   const { data, reload } = useAsyncData(async () => {
     const [notes, links] = await Promise.all([listNotes(search), listNoteEntityLinks()]);
@@ -43,10 +46,13 @@ export default function NotesScreen() {
 
   const columns = width >= 620 ? 3 : 2;
 
-  const create = async () => {
-    const id = await createNote({ title: '', body: '' });
+  const create = async (noteType: NoteType = 'text') => {
+    const body = noteType === 'checklist' ? '[ ] ' : '';
+    const id = await createNote({ title: '', body, note_type: noteType });
     router.push(`/notes/${id}`);
   };
+
+  const openTypePicker = () => setTypePicker(true);
 
   const open = (id: number) => router.push(`/notes/${id}`);
   const toggle = async (n: Note) => {
@@ -64,7 +70,7 @@ export default function NotesScreen() {
         <AppHeader title="Notes" subtitle="Your business notebook" />
 
         <Pressable
-          onPress={create}
+          onPress={openTypePicker}
           style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -82,6 +88,7 @@ export default function NotesScreen() {
           <Text variant="body" color={t.textMuted} style={{ flex: 1 }}>
             Take a note…
           </Text>
+          <Ionicons name="mic-outline" size={20} color={t.textMuted} />
           <Ionicons name="add-circle" size={26} color={t.primary} />
         </Pressable>
 
@@ -106,7 +113,7 @@ export default function NotesScreen() {
                 : 'Jot down recipes, ideas and supplier info — and attach them to customers, products or orders.'
             }
             actionLabel={search ? undefined : 'New note'}
-            onAction={search ? undefined : create}
+            onAction={search ? undefined : openTypePicker}
           />
         ) : view === 'card' ? (
           <CardView
@@ -129,7 +136,19 @@ export default function NotesScreen() {
           <ConnectionView notes={notes} links={links} onOpen={open} />
         )}
       </Screen>
-      <FAB icon="add" label="Note" onPress={create} />
+      <FAB icon="add" label="Note" onPress={openTypePicker} />
+      <SelectModal
+        visible={typePicker}
+        title="New note"
+        searchable={false}
+        onClose={() => setTypePicker(false)}
+        onSelect={(id) => create(id as NoteType)}
+        options={(Object.keys(NOTE_TYPE_META) as NoteType[]).map((type) => ({
+          id: type,
+          label: NOTE_TYPE_META[type].label,
+          sublabel: NOTE_TYPE_META[type].hint,
+        }))}
+      />
     </>
   );
 }

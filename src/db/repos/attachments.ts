@@ -11,11 +11,12 @@ export async function addAttachment(
   entityId: number,
   uri: string,
   mime: string | null,
+  durationMs: number | null = null,
 ): Promise<number> {
   const db = await getDb();
   const res = await db.runAsync(
-    'INSERT INTO attachments (entity, entity_id, uri, mime, created_at) VALUES (?, ?, ?, ?, ?)',
-    [entity, entityId, uri, mime, nowIso()],
+    'INSERT INTO attachments (entity, entity_id, uri, mime, duration_ms, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [entity, entityId, uri, mime, durationMs, nowIso()],
   );
   return res.lastInsertRowId;
 }
@@ -27,6 +28,12 @@ export async function listAttachments(entity: AttachmentEntity, entityId: number
     'SELECT * FROM attachments WHERE entity = ? AND entity_id = ? ORDER BY created_at DESC, id DESC',
     [entity, entityId],
   );
+}
+
+/** Every attachment row (for zip backup packaging). */
+export async function listAllAttachments(): Promise<Attachment[]> {
+  const db = await getDb();
+  return db.getAllAsync<Attachment>('SELECT * FROM attachments ORDER BY id ASC');
 }
 
 /** Delete an attachment row and its backing file (file removal is best-effort). */

@@ -9,6 +9,7 @@ import { useApp } from '@/context/app-context';
 import { useTheme } from '@/hooks/use-theme';
 import { exportBackup, importBackup } from '@/lib/backup';
 import { clearDemoData, loadDemoData, type DemoCounts } from '@/lib/demo-data';
+import { toUserMessage } from '@/lib/errors';
 import {
   exportCustomersCsv,
   exportExpensesCsv,
@@ -58,7 +59,7 @@ export default function DataScreen() {
     try {
       await fn();
     } catch (e) {
-      Alert.alert('Something went wrong', e instanceof Error ? e.message : 'Please try again.');
+      Alert.alert('Something went wrong', toUserMessage(e));
     } finally {
       setBusy(null);
     }
@@ -134,8 +135,8 @@ export default function DataScreen() {
               'Trackr stores everything on this device only. Back up regularly so you never lose your records if your phone is lost or replaced.',
             ]}
             points={[
-              { term: 'Backup', desc: 'A single file containing all of your Trackr data. Save it to Google Drive, Files or email.' },
-              { term: 'Restore', desc: 'Load a backup file back into Trackr. It replaces everything currently in the app.' },
+              { term: 'Backup', desc: 'A zip file with all of your Trackr data plus voice notes and photos. Save it to Google Drive, Files or email.' },
+              { term: 'Restore', desc: 'Load a backup zip (or older JSON) back into Trackr. It replaces everything currently in the app.' },
               { term: 'CSV export', desc: 'A spreadsheet of one module (opens in Excel or Google Sheets) for sharing or accounting.' },
             ]}
           />
@@ -147,8 +148,8 @@ export default function DataScreen() {
         <SectionHeader title="Back up now" icon="cloud-upload" />
         <Card style={{ gap: Spacing.md }}>
           <Text variant="body" color={t.textSecondary}>
-            Save a complete copy of everything in Trackr to a file. Keep it somewhere safe like Google Drive, Files or
-            your email so you can recover your data later.
+            Save a complete copy of everything in Trackr — including voice notes and photos — as a zip file. Keep it
+            somewhere safe like Google Drive, Files or your email so you can recover your data later.
           </Text>
           <Button
             title="Back up now"
@@ -165,8 +166,8 @@ export default function DataScreen() {
         <SectionHeader title="Restore from a file" icon="cloud-download" />
         <Card style={{ gap: Spacing.md }}>
           <Text variant="body" color={t.textSecondary}>
-            Bring back data from a backup file. This overwrites everything currently in Trackr, so only use it on a fresh
-            install or when you want to roll back to a saved copy.
+            Bring back data from a Trackr backup zip (or an older JSON backup). This overwrites everything currently in
+            Trackr, so only use it on a fresh install or when you want to roll back to a saved copy.
           </Text>
           <Button
             title="Restore from backup"

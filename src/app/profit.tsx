@@ -21,13 +21,14 @@ import { Radius, Spacing } from '@/constants/theme';
 import { getIndustry } from '@/constants/industries';
 import { useApp } from '@/context/app-context';
 import { sumExpenses } from '@/db/repos/expenses';
-import { getProfitRecord, listProfitRecords, upsertProfitRecord } from '@/db/repos/profit';
+import { getProfitRecord, listProfitRecords, setProfitRecordLocked, upsertProfitRecord } from '@/db/repos/profit';
 import { sumSales } from '@/db/repos/sales';
 import { updateSettings } from '@/db/repos/settings';
 import type { AllocationBucket, AllocationSlice, ProfitRecord } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDate } from '@/lib/date';
+import { toUserMessage } from '@/lib/errors';
 import {
   allocationTotal,
   computeProfit,
@@ -157,16 +158,25 @@ export default function ProfitScreen() {
       Alert.alert('Allocation must total 100%', `Your buckets currently add up to ${round1(total)}%.`);
       return;
     }
+    if (record?.locked === 1) {
+      Alert.alert('Month locked', 'Unlock this month before updating the recorded close.');
+      return;
+    }
     const cleanBuckets = toBuckets(draft);
     const slices = splitAllocation(realized, cleanBuckets);
-    await upsertProfitRecord({
-      month: monthKey,
-      revenue: summary?.revenue ?? 0,
-      cogs: summary?.cogs ?? 0,
-      expenses: summary?.expenses ?? 0,
-      net_profit: net,
-      allocation: JSON.stringify(slices),
-    });
+    try {
+      await upsertProfitRecord({
+        month: monthKey,
+        revenue: summary?.revenue ?? 0,
+        cogs: summary?.cogs ?? 0,
+        expenses: summary?.expenses ?? 0,
+        net_profit: net,
+        allocation: JSON.stringify(slices),
+      });
+    } catch (e) {
+      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t record this month. Please try again.'));
+      return;
+    }
     // Only the current month updates the global starting template for future months.
     if (isCurrent) {
       await updateSettings({ profit_allocation: JSON.stringify(cleanBuckets) });
@@ -176,6 +186,27 @@ export default function ProfitScreen() {
     await reload();
     setEditing(false);
     Alert.alert('Recorded', `${formatMonthKey(monthKey)} saved to your profit history.`);
+  };
+
+  const toggleLock = async () => {
+    if (!record) {
+      Alert.alert('Record first', 'Save this month’s profit snapshot before locking it.');
+      return;
+    }
+    const next = record.locked !== 1;
+    if (next) {
+      const choice = await confirm({
+        title: `Close ${formatMonthKey(monthKey)}?`,
+        message: 'Locking prevents accidental overwrites. You can unlock later if you need to revise.',
+        actions: [
+          { label: 'Lock month', value: 'lock' },
+          { label: 'Cancel', style: 'cancel', value: 'cancel' },
+        ],
+      });
+      if (choice !== 'lock') return;
+    }
+    await setProfitRecordLocked(monthKey, next);
+    await reload();
   };
 
   return (
@@ -222,7 +253,15 @@ export default function ProfitScreen() {
                 tip="Trackr uses cash-basis figures: amounts count in the month you dated them."
               />
             </View>
-            {record ? <Chip label={`Saved ${formatDate(record.updated_at)}`} tone="success" icon="checkmark-circle" /> : null}
+            {record ? (
+              <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
+                <Chip
+                  label={record.locked === 1 ? 'Locked' : `Saved ${formatDate(record.updated_at)}`}
+                  tone={record.locked === 1 ? 'warning' : 'success'}
+                  icon={record.locked === 1 ? 'lock-closed' : 'checkmark-circle'}
+                />
+              </View>
+            ) : null}
           </View>
           <Row label="Revenue (sales income)" value={money(summary?.revenue ?? 0)} color={t.success} />
           <Row label="Cost of goods sold (COGS)" value={`- ${money(summary?.cogs ?? 0)}`} />
@@ -267,8 +306,10 @@ export default function ProfitScreen() {
             tip="Try the industry template, an even split, or copy last month to start fast."
           />
         </View>
-        <Pressable onPress={() => setEditing((v) => !v)} hitSlop={8}>
-          <Text variant="label" color={t.primary}>{editing ? 'Done' : 'Edit split'}</Text>
+        <Pressable onPress={() => { if (record?.locked !== 1) setEditing((v) => !v); }} hitSlop={8}>
+          <Text variant="label" color={record?.locked === 1 ? t.textMuted : t.primary}>
+            {record?.locked === 1 ? 'Locked' : editing ? 'Done' : 'Edit split'}
+          </Text>
         </Pressable>
       </View>
 
@@ -357,7 +398,16 @@ export default function ProfitScreen() {
               icon="save"
               variant={record ? 'secondary' : 'primary'}
               onPress={() => (balanced ? recordMonth() : setEditing(true))}
+              disabled={record?.locked === 1}
             />
+            {record ? (
+              <Button
+                title={record.locked === 1 ? 'Unlock month' : 'Lock / close month'}
+                icon={record.locked === 1 ? 'lock-open' : 'lock-closed'}
+                variant="ghost"
+                onPress={toggleLock}
+              />
+            ) : null}
           </>
         )}
       </Card>
@@ -421,6 +471,7 @@ function HistoryRow({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text variant="subtitle">{formatMonthKey(record.month)}</Text>
           {active ? <Chip label="Viewing" tone="primary" /> : null}
+          {record.locked === 1 ? <Chip label="Locked" tone="warning" icon="lock-closed" /> : null}
         </View>
         <Text variant="subtitle" color={positive ? t.success : record.net_profit < 0 ? t.danger : t.textSecondary}>
           {money(record.net_profit)}

@@ -71,9 +71,32 @@ export function NoteCard({
         </Pressable>
       </View>
 
+      {(note.note_type ?? 'text') !== 'text' ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons
+            name={
+              note.note_type === 'voice'
+                ? 'mic-outline'
+                : note.note_type === 'checklist'
+                  ? 'checkbox-outline'
+                  : 'link-outline'
+            }
+            size={12}
+            color={c.accent}
+          />
+          <Text variant="caption" color={t.textSecondary} style={{ textTransform: 'capitalize' }}>
+            {note.note_type}
+          </Text>
+        </View>
+      ) : null}
+
       {snippet ? (
         <Text variant="body" color={t.textSecondary} numberOfLines={7} style={{ fontSize: FontSize.sm, lineHeight: 20 }}>
           {snippet}
+        </Text>
+      ) : note.note_type === 'voice' ? (
+        <Text variant="caption" color={t.textMuted}>
+          Voice note
         </Text>
       ) : null}
 

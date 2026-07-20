@@ -72,6 +72,7 @@ export async function updateProduct(id: number, input: ProductInput): Promise<vo
     ],
   );
   await logAudit('product', id, 'update', `Updated product "${input.name}"`);
+  void import('@/lib/event-notifications').then((m) => m.maybeNotifyLowStock(id)).catch(() => {});
 }
 
 export async function deleteProduct(id: number): Promise<void> {
@@ -88,6 +89,8 @@ export async function adjustProductStock(id: number, delta: number, reason: stri
     'INSERT INTO stock_movements (item_type, item_id, change, reason, created_at) VALUES (?, ?, ?, ?, ?)',
     ['product', id, delta, reason, nowIso()],
   );
+  // Fire-and-forget low-stock alert (throttled inside event-notifications).
+  void import('@/lib/event-notifications').then((m) => m.maybeNotifyLowStock(id)).catch(() => {});
 }
 
 /**

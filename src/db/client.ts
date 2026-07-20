@@ -266,6 +266,39 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
   CREATE INDEX IF NOT EXISTS idx_attachments_entity ON attachments(entity, entity_id);
   `,
+  // v6: note types + voice attachments (duration) + contact source id for re-sync
+  `
+  ALTER TABLE notes ADD COLUMN note_type TEXT NOT NULL DEFAULT 'text';
+  ALTER TABLE attachments ADD COLUMN duration_ms INTEGER;
+  ALTER TABLE customers ADD COLUMN contact_id TEXT;
+  CREATE INDEX IF NOT EXISTS idx_customers_contact ON customers(contact_id);
+  `,
+  // v7: SME modules — tax on expenses, period lock, marketing templates & ideas
+  `
+  ALTER TABLE expenses ADD COLUMN tax_rate REAL NOT NULL DEFAULT 0;
+  ALTER TABLE profit_records ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
+
+  CREATE TABLE IF NOT EXISTS message_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    category TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS marketing_ideas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    done INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_message_templates_updated ON message_templates(updated_at);
+  CREATE INDEX IF NOT EXISTS idx_marketing_ideas_sort ON marketing_ideas(sort_order, id);
+  `,
 ];
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {

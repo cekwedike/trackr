@@ -107,6 +107,7 @@ export function exportExpensesCsv(): Promise<CsvExportResult> {
     { header: 'Category', value: (e) => e.category },
     { header: 'Description', value: (e) => e.description },
     { header: 'Payment method', value: (e) => e.payment_method },
+    { header: 'Tax rate %', value: (e) => e.tax_rate ?? 0 },
   ]);
 }
 

@@ -1,5 +1,5 @@
 import { getDb } from '@/db/client';
-import type { LinkTargetType, Link, Note } from '@/db/types';
+import type { LinkTargetType, Link, Note, NoteType } from '@/db/types';
 import { logAudit } from '@/lib/audit';
 import { nowIso } from '@/lib/date';
 
@@ -8,6 +8,7 @@ export interface NoteInput {
   body: string;
   pinned?: number;
   color?: string | null;
+  note_type?: NoteType;
 }
 
 const WIKI_LINK_RE = /\[\[([^\]]+)\]\]/g;
@@ -84,9 +85,10 @@ async function rebuildWikiLinks(noteId: number, body: string): Promise<void> {
 export async function createNote(input: NoteInput): Promise<number> {
   const db = await getDb();
   const now = nowIso();
+  const noteType = input.note_type ?? 'text';
   const res = await db.runAsync(
-    'INSERT INTO notes (title, body, pinned, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [input.title || 'Untitled', input.body ?? '', input.pinned ?? 0, input.color ?? null, now, now],
+    'INSERT INTO notes (title, body, pinned, color, note_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [input.title || 'Untitled', input.body ?? '', input.pinned ?? 0, input.color ?? null, noteType, now, now],
   );
   const id = res.lastInsertRowId;
   await rebuildWikiLinks(id, input.body ?? '');
@@ -97,17 +99,28 @@ export async function createNote(input: NoteInput): Promise<number> {
 
 export async function updateNote(id: number, input: NoteInput): Promise<void> {
   const db = await getDb();
-  await db.runAsync('UPDATE notes SET title = ?, body = ?, pinned = ?, color = ?, updated_at = ? WHERE id = ?', [
-    input.title || 'Untitled',
-    input.body ?? '',
-    input.pinned ?? 0,
-    input.color ?? null,
-    nowIso(),
-    id,
-  ]);
+  const existing = await db.getFirstAsync<{ note_type: string }>('SELECT note_type FROM notes WHERE id = ?', [id]);
+  await db.runAsync(
+    'UPDATE notes SET title = ?, body = ?, pinned = ?, color = ?, note_type = ?, updated_at = ? WHERE id = ?',
+    [
+      input.title || 'Untitled',
+      input.body ?? '',
+      input.pinned ?? 0,
+      input.color ?? null,
+      input.note_type ?? existing?.note_type ?? 'text',
+      nowIso(),
+      id,
+    ],
+  );
   await rebuildWikiLinks(id, input.body ?? '');
   await resolveDanglingLinksTo(input.title);
   await logAudit('note', id, 'update', `Updated note "${input.title || 'Untitled'}"`);
+}
+
+/** Change note type without rewriting body (caller may adjust body separately). */
+export async function setNoteType(id: number, noteType: NoteType): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('UPDATE notes SET note_type = ?, updated_at = ? WHERE id = ?', [noteType, nowIso(), id]);
 }
 
 /** When a note is created/renamed, resolve any unresolved wiki links that referenced its title. */
@@ -180,15 +193,16 @@ export interface Backlink {
   id: number;
   source_note_id: number;
   source_title: string;
+  source_updated_at?: string;
 }
 
 /** Notes that reference a given entity (product/sale/order/customer/expense). */
 export async function getNotesLinkingEntity(type: LinkTargetType, id: number): Promise<Backlink[]> {
   const db = await getDb();
   return db.getAllAsync<Backlink>(
-    `SELECT l.id, l.source_note_id, n.title AS source_title
+    `SELECT l.id, l.source_note_id, n.title AS source_title, n.updated_at AS source_updated_at
      FROM links l JOIN notes n ON n.id = l.source_note_id
-     WHERE l.target_type = ? AND l.target_id = ? ORDER BY n.title ASC`,
+     WHERE l.target_type = ? AND l.target_id = ? ORDER BY n.updated_at DESC, n.title ASC`,
     [type, id],
   );
 }

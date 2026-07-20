@@ -5,6 +5,7 @@ import { getSettings, updateSettings } from '@/db/repos/settings';
 import type { Settings } from '@/db/types';
 import { formatMoney as fmtMoney } from '@/lib/money';
 import { ensureNotificationHandler } from '@/lib/notifications';
+import { toUserMessage } from '@/lib/errors';
 import { runDueRecurring } from '@/lib/recurring';
 
 interface AppContextValue {
@@ -66,9 +67,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         runDueRecurring().catch(() => {
           // recurring materialisation is non-critical for startup
         });
+        // Reschedule event alerts (low stock, dues, backup) from current data.
+        import('@/lib/event-notifications')
+          .then((m) => m.syncEventNotifications())
+          .catch(() => {});
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toUserMessage(e, 'Couldn’t open your books. Please try again.'));
     }
   }, []);
 

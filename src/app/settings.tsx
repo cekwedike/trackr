@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, View } from 'react-native';
 
@@ -16,7 +17,14 @@ import { useTheme } from '@/hooks/use-theme';
 import { clearPin, isBiometricAvailable, setPin } from '@/lib/auth';
 import { exportBackup, importBackup } from '@/lib/backup';
 import { dayjs } from '@/lib/date';
+import { toUserMessage } from '@/lib/errors';
 import { cancelDailyNudge, cancelWeeklyNudge, scheduleDailyNudge, scheduleWeeklyNudge } from '@/lib/notifications';
+import {
+  getAllNotifCategories,
+  NOTIF_CATEGORY_META,
+  setNotifCategoryEnabled,
+  type NotifCategory,
+} from '@/lib/notification-prefs';
 import { openWhatsNew } from '@/components/whats-new';
 
 // Nudge preferences live in secure-store (the settings table has no columns for
@@ -44,6 +52,7 @@ function timeLabel(hour: number, minute: number): string {
 
 export default function Settings() {
   const t = useTheme();
+  const router = useRouter();
   const confirm = useConfirm();
   const { settings, reloadSettings, industry, setIndustry } = useApp();
   const [name, setName] = useState('');
@@ -57,6 +66,7 @@ export default function Settings() {
   const [dailyHour, setDailyHour] = useState(9);
   const [dailyMinute, setDailyMinute] = useState(0);
   const [timeModal, setTimeModal] = useState(false);
+  const [notifCats, setNotifCats] = useState<Record<NotifCategory, boolean> | null>(null);
 
   useEffect(() => {
     if (settings) setName(settings.business_name);
@@ -65,16 +75,18 @@ export default function Settings() {
   useEffect(() => {
     (async () => {
       try {
-        const [d, w, h, m] = await Promise.all([
+        const [d, w, h, m, cats] = await Promise.all([
           SecureStore.getItemAsync(NUDGE_DAILY_ENABLED_KEY),
           SecureStore.getItemAsync(NUDGE_WEEKLY_ENABLED_KEY),
           SecureStore.getItemAsync(NUDGE_DAILY_HOUR_KEY),
           SecureStore.getItemAsync(NUDGE_DAILY_MINUTE_KEY),
+          getAllNotifCategories(),
         ]);
         setDailyNudge(d === '1');
         setWeeklyNudge(w === '1');
         if (h != null) setDailyHour(Number(h));
         if (m != null) setDailyMinute(Number(m));
+        setNotifCats(cats);
       } catch {
         // secure-store read is best-effort; fall back to defaults
       }
@@ -211,12 +223,40 @@ export default function Settings() {
     await SecureStore.setItemAsync(NUDGE_WEEKLY_ENABLED_KEY, next ? '1' : '0').catch(() => {});
   };
 
+  const toggleNotifCategory = async (cat: NotifCategory) => {
+    if (!notifCats) return;
+    const next = !notifCats[cat];
+    await setNotifCategoryEnabled(cat, next);
+    setNotifCats({ ...notifCats, [cat]: next });
+
+    // Apply immediately: schedule or cancel depending on the category.
+    try {
+      if (cat === 'crm') {
+        const { listCustomers } = await import('@/db/repos/customers');
+        const { syncBirthdayNotifications } = await import('@/lib/birthday-notifications');
+        const customers = await listCustomers();
+        if (next) await syncBirthdayNotifications(customers);
+        else {
+          for (const c of customers) {
+            const { cancelBirthdayNotification } = await import('@/lib/birthday-notifications');
+            await cancelBirthdayNotification(c.id);
+          }
+        }
+      } else {
+        const { syncEventNotifications } = await import('@/lib/event-notifications');
+        await syncEventNotifications();
+      }
+    } catch {
+      // best-effort apply
+    }
+  };
+
   const doExport = async () => {
     setBusy(true);
     try {
       await exportBackup();
     } catch (e) {
-      Alert.alert('Export failed', String(e));
+      Alert.alert('Export failed', toUserMessage(e, 'Couldn’t export your backup. Please try again.'));
     } finally {
       setBusy(false);
     }
@@ -240,7 +280,7 @@ export default function Settings() {
         Alert.alert('Restored', 'Your data has been restored.');
       }
     } catch (e) {
-      Alert.alert('Import failed', String(e));
+      Alert.alert('Import failed', toUserMessage(e, 'Couldn’t restore that backup. Please try again.'));
     } finally {
       setBusy(false);
     }
@@ -315,12 +355,56 @@ export default function Settings() {
         </Card>
       </FadeSlide>
 
+      <FadeSlide delay={140}>
+        <SectionHeader title="Event alerts" subtitle="Local only — never leaves this device" />
+        <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+          {(Object.keys(NOTIF_CATEGORY_META) as NotifCategory[]).map((cat, idx) => {
+            const meta = NOTIF_CATEGORY_META[cat];
+            return (
+              <View key={cat}>
+                {idx > 0 ? <Divider /> : null}
+                <ToggleRow
+                  icon={meta.icon}
+                  label={meta.label}
+                  value={notifCats?.[cat] ?? false}
+                  onToggle={() => toggleNotifCategory(cat)}
+                  hint={meta.hint}
+                />
+              </View>
+            );
+          })}
+        </Card>
+      </FadeSlide>
+
       <FadeSlide delay={160}>
+        <SectionHeader title="Customers" />
+        <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
+          <ListRow
+            icon="people"
+            iconTone="info"
+            title="Import from contacts"
+            subtitle="Add selected people as customers"
+            onPress={() => router.push('/customers/import' as Href)}
+            right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />}
+          />
+          <Divider />
+          <ListRow
+            icon="sync"
+            iconTone="primary"
+            title="Re-sync contacts"
+            subtitle="Refresh names, phones & birthdays"
+            onPress={() => router.push('/customers/import?mode=resync' as Href)}
+            right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />}
+          />
+        </Card>
+      </FadeSlide>
+
+      <FadeSlide delay={180}>
         <SectionHeader title="Data" />
         <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
-          <ListRow icon="cloud-upload" iconTone="success" title="Export backup" subtitle="Save all data to a file" onPress={doExport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+          <ListRow icon="cloud-upload" iconTone="success" title="Export backup" subtitle="Zip with data + voice/media files" onPress={doExport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
           <Divider />
-          <ListRow icon="cloud-download" iconTone="warning" title="Restore backup" subtitle="Replace data from a file" onPress={doImport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+          <ListRow icon="cloud-download" iconTone="warning" title="Restore backup" subtitle="Replace data from a zip or JSON file" onPress={doImport} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
         </Card>
       </FadeSlide>
 
@@ -328,6 +412,12 @@ export default function Settings() {
         <SectionHeader title="About" />
         <Card padded={false} style={{ paddingHorizontal: Spacing.lg, marginBottom: Spacing.lg }}>
           <ListRow icon="sparkles" iconTone="accent" title="What's new" subtitle="See the latest features & changes" onPress={openWhatsNew} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+          <Divider />
+          <ListRow icon="shield-checkmark" iconTone="info" title="Privacy Policy" subtitle="On-device data & permissions" onPress={() => router.push('/legal/privacy' as Href)} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+          <Divider />
+          <ListRow icon="document-text" iconTone="primary" title="Terms of Use" subtitle="License & responsibilities" onPress={() => router.push('/legal/terms' as Href)} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
+          <Divider />
+          <ListRow icon="cloud-offline" iconTone="warning" title="Offline & Data" subtitle="Local storage & backups" onPress={() => router.push('/legal/offline' as Href)} right={<Ionicons name="chevron-forward" size={16} color={t.textMuted} />} />
         </Card>
       </FadeSlide>
 

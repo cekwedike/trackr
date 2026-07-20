@@ -11,6 +11,7 @@ import { useApp } from '@/context/app-context';
 import { adjustDebt, getCustomer } from '@/db/repos/customers';
 import { getNotesLinkingEntity } from '@/db/repos/notes';
 import { listPayments, recordDebtPayment } from '@/db/repos/payments';
+import { listSalesForCustomer } from '@/db/repos/sales';
 import type { PaymentMethod } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
@@ -41,9 +42,39 @@ export default function CustomerDetail() {
   const { data, loading, reload } = useAsyncData(async () => {
     const customer = await getCustomer(customerId);
     if (!customer) return null;
-    const notes = await getNotesLinkingEntity('customer', customerId);
-    const payments = await listPayments('debt', customerId);
-    return { customer, notes, payments };
+    const [notes, payments, sales] = await Promise.all([
+      getNotesLinkingEntity('customer', customerId),
+      listPayments('debt', customerId),
+      listSalesForCustomer(customerId, 40),
+    ]);
+    type TimelineItem =
+      | { kind: 'sale'; id: number; at: string; amount: number; method: string }
+      | { kind: 'payment'; id: number; at: string; amount: number; method: string }
+      | { kind: 'note'; id: number; at: string; title: string; noteId: number };
+    const timeline: TimelineItem[] = [
+      ...sales.map((s) => ({
+        kind: 'sale' as const,
+        id: s.id,
+        at: s.occurred_at,
+        amount: s.total,
+        method: s.payment_method,
+      })),
+      ...payments.map((p) => ({
+        kind: 'payment' as const,
+        id: p.id,
+        at: p.created_at,
+        amount: p.amount,
+        method: p.method,
+      })),
+      ...notes.map((n) => ({
+        kind: 'note' as const,
+        id: n.id,
+        at: n.source_updated_at ?? '',
+        title: n.source_title,
+        noteId: n.source_note_id,
+      })),
+    ].sort((a, b) => (a.at < b.at ? 1 : -1));
+    return { customer, payments, timeline };
   }, [customerId]);
 
   const addDebt = async () => {
@@ -97,7 +128,7 @@ export default function CustomerDetail() {
   }
   if (editing) return <CustomerForm initial={data.customer} onDone={() => { setEditing(false); reload(); }} />;
 
-  const { customer, notes, payments } = data;
+  const { customer, payments, timeline } = data;
   const owes = customer.debt_balance > 0;
   const methodLabel = PAYMENT_METHODS.find((m) => m.value === payMethod)?.label;
 
@@ -150,7 +181,46 @@ export default function CustomerDetail() {
         </View>
       </Card>
 
-      {payments.length > 0 ? (
+      {timeline.length > 0 ? (
+        <>
+          <SectionHeader title="Activity" subtitle="Sales, payments & notes" style={{ marginTop: Spacing.lg }} />
+          <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
+            {timeline.slice(0, 20).map((item, idx) => (
+              <View key={`${item.kind}-${item.id}`}>
+                {item.kind === 'sale' ? (
+                  <ListRow
+                    icon="cart"
+                    iconTone="success"
+                    title={`Sale · ${money(item.amount)}`}
+                    subtitle={`${formatDateTime(item.at)} · ${item.method}`}
+                    onPress={() => router.push(`/sales/${item.id}`)}
+                  />
+                ) : null}
+                {item.kind === 'payment' ? (
+                  <ListRow
+                    icon="arrow-down"
+                    iconTone="success"
+                    title={`Payment · ${money(item.amount)}`}
+                    subtitle={`${formatDateTime(item.at)} · ${PAYMENT_METHODS.find((m) => m.value === item.method)?.label ?? item.method}`}
+                  />
+                ) : null}
+                {item.kind === 'note' ? (
+                  <ListRow
+                    icon="document-text"
+                    iconTone="primary"
+                    title={item.title}
+                    subtitle={item.at ? formatDateTime(item.at) : undefined}
+                    onPress={() => router.push(`/notes/${item.noteId}`)}
+                  />
+                ) : null}
+                {idx < Math.min(timeline.length, 20) - 1 ? <Divider /> : null}
+              </View>
+            ))}
+          </Card>
+        </>
+      ) : null}
+
+      {payments.length > 0 && timeline.every((x) => x.kind !== 'payment') ? (
         <>
           <SectionHeader title="Payment history" subtitle={`${payments.length} payment${payments.length === 1 ? '' : 's'}`} style={{ marginTop: Spacing.lg }} />
           <Card>
@@ -172,19 +242,7 @@ export default function CustomerDetail() {
         </>
       ) : null}
 
-      {notes.length > 0 ? (
-        <>
-          <SectionHeader title="Linked notes" style={{ marginTop: Spacing.lg }} />
-          <Card padded={false} style={{ paddingHorizontal: Spacing.lg }}>
-            {notes.map((n, idx) => (
-              <View key={n.id}>
-                <ListRow icon="document-text" iconTone="primary" title={n.source_title} onPress={() => router.push(`/notes/${n.source_note_id}`)} />
-                {idx < notes.length - 1 ? <Divider /> : null}
-              </View>
-            ))}
-          </Card>
-        </>
-      ) : null}
+      {/* Linked notes are included in Activity when present */}
 
       <SelectModal
         visible={methodModal}

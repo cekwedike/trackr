@@ -89,6 +89,12 @@ export async function createSale(input: SaleInput): Promise<number> {
     }
   });
   await logAudit('sale', saleId, 'create', `Recorded sale of ${await auditMoney(total)}`);
+  void import('@/lib/event-notifications')
+    .then(async (m) => {
+      await m.maybeNotifyLowStockForProducts(input.items.map((it) => it.product_id));
+      if (input.customer_id && input.payment_method === 'credit') await m.syncPaymentsNudge();
+    })
+    .catch(() => {});
   return saleId;
 }
 
@@ -128,6 +134,12 @@ export async function deleteSale(id: number): Promise<void> {
     await db.runAsync('DELETE FROM sales WHERE id = ?', [id]);
   });
   await logAudit('sale', id, 'delete', `Deleted sale of ${await auditMoney(sale.total)}`);
+  void import('@/lib/event-notifications')
+    .then(async (m) => {
+      await m.maybeNotifyLowStockForProducts(items.map((it) => it.product_id));
+      if (sale.customer_id && sale.payment_method === 'credit') await m.syncPaymentsNudge();
+    })
+    .catch(() => {});
 }
 
 /** Lightweight row for global search results. */
@@ -151,6 +163,15 @@ export async function searchSales(q: string, limit = 20): Promise<SaleSearchRow[
      WHERE s.note LIKE ? OR c.name LIKE ?
      ORDER BY s.occurred_at DESC LIMIT ?`,
     [like, like, limit],
+  );
+}
+
+/** Sales linked to a customer, newest first (for customer timeline). */
+export async function listSalesForCustomer(customerId: number, limit = 50): Promise<Sale[]> {
+  const db = await getDb();
+  return db.getAllAsync<Sale>(
+    'SELECT * FROM sales WHERE customer_id = ? ORDER BY occurred_at DESC LIMIT ?',
+    [customerId, limit],
   );
 }
 

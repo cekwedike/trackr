@@ -72,7 +72,7 @@ function Section({
       icon={icon}
       count={count}
       headerRight={action && onAction ? <SeeAll label={action} onPress={onAction} /> : undefined}
-      style={{ marginBottom: Spacing.lg }}
+      style={{ marginBottom: Spacing.xl }}
       contentStyle={{ gap, paddingBottom: Spacing.md }}
     >
       {children}
@@ -153,10 +153,12 @@ function QuickActions() {
   const t = useTheme();
   const router = useRouter();
   const { industry, terms, accent } = useApp();
+  // Compact dashboard: surface at most four actions; the rest live on the FAB.
+  const actions = industry.quickActions.slice(0, 4);
   return (
     <View style={{ marginBottom: Spacing.lg }}>
       <AnimatedGrid
-        data={industry.quickActions}
+        data={actions}
         columns={2}
         keyExtractor={(key) => key}
         renderItem={(key) => {
