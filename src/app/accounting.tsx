@@ -122,6 +122,7 @@ export default function AccountingScreen() {
             message="Log spending to see category totals and true profit."
             actionLabel="Add expense"
             onAction={() => router.push('/expenses/new')}
+            compact
           />
         </Card>
       )}

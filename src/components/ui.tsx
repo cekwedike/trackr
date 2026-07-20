@@ -347,7 +347,14 @@ export function Button({
         />
       ) : null}
       {loading ? (
-        <RNText style={{ color: fg, fontWeight: FontWeight.semibold, fontSize: size === 'sm' ? FontSize.sm : FontSize.md }}>
+        <RNText
+          style={{
+            color: fg,
+            fontWeight: FontWeight.semibold,
+            fontSize: size === 'sm' ? FontSize.sm : FontSize.md,
+            opacity: 0.72,
+          }}
+        >
           {title.endsWith('…') || title.endsWith('...') ? title : `${title}…`}
         </RNText>
       ) : (
@@ -384,6 +391,7 @@ export function IconButton({
       hitSlop={8}
       scaleTo={PressScale.icon}
       opacityTo={0.7}
+      haptic
       style={{
         width: 40,
         height: 40,
@@ -608,7 +616,7 @@ export function Chip({ label, tone = 'default', icon, onPress }: { label: string
   };
   if (onPress) {
     return (
-      <PressableScale onPress={onPress} scaleTo={PressScale.chip} style={chipStyle}>
+      <PressableScale onPress={onPress} scaleTo={PressScale.chip} haptic style={chipStyle}>
         {body}
       </PressableScale>
     );
@@ -676,6 +684,7 @@ export function ListRow({
       onLongPress={onLongPress}
       scaleTo={PressScale.row}
       opacityTo={0.7}
+      haptic={!!onPress || !!onLongPress}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -779,7 +788,7 @@ export function InfoRow({
   );
   if (onPress) {
     return (
-      <PressableScale onPress={onPress} scaleTo={PressScale.row} opacityTo={0.7}>
+      <PressableScale onPress={onPress} scaleTo={PressScale.row} opacityTo={0.7} haptic>
         {inner}
       </PressableScale>
     );
@@ -843,6 +852,7 @@ export function EmptyState({
   onAction,
   secondaryLabel,
   onSecondary,
+  compact,
 }: {
   icon?: IconName;
   title: string;
@@ -852,47 +862,52 @@ export function EmptyState({
   onAction?: () => void;
   secondaryLabel?: string;
   onSecondary?: () => void;
+  /** Smaller layout for section empties inside hub cards (not full-screen lists). */
+  compact?: boolean;
 }) {
   const t = useTheme();
   const { accent } = useApp();
+  const outer = compact ? 72 : 104;
+  const inner = compact ? 52 : 72;
+  const iconSize = compact ? 26 : 34;
   return (
     <FadeSlide
       style={{
         width: '100%',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: Spacing.xxxl,
+        paddingVertical: compact ? Spacing.lg : Spacing.xxxl,
         paddingHorizontal: Spacing.lg,
-        minHeight: 320,
-        flexGrow: 1,
+        minHeight: compact ? undefined : 320,
+        flexGrow: compact ? 0 : 1,
       }}
     >
       {/* Layered medallion: soft outer halo + tinted inner disc for a designed, branded feel */}
       <View
         style={{
-          width: 104,
-          height: 104,
+          width: outer,
+          height: outer,
           borderRadius: Radius.pill,
           backgroundColor: hexToRgba(accent, 0.07),
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: Spacing.lg,
+          marginBottom: compact ? Spacing.md : Spacing.lg,
         }}
       >
         <View
           style={{
-            width: 72,
-            height: 72,
+            width: inner,
+            height: inner,
             borderRadius: Radius.pill,
             backgroundColor: hexToRgba(accent, 0.14),
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Ionicons name={icon} size={34} color={accent} />
+          <Ionicons name={icon} size={iconSize} color={accent} />
         </View>
       </View>
-      <Text variant="title" style={{ textAlign: 'center' }}>{title}</Text>
+      <Text variant={compact ? 'subtitle' : 'title'} style={{ textAlign: 'center' }}>{title}</Text>
       {message ? (
         <Text variant="body" color={t.textSecondary} style={{ textAlign: 'center', maxWidth: 300, marginTop: Spacing.sm }}>
           {message}
@@ -903,13 +918,13 @@ export function EmptyState({
           title={actionLabel}
           onPress={onAction}
           icon={actionIcon}
-          style={{ marginTop: Spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 300 }}
+          style={{ marginTop: compact ? Spacing.lg : Spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 300 }}
         />
       ) : null}
       {secondaryLabel && onSecondary ? (
-        <Pressable onPress={onSecondary} hitSlop={8} style={{ marginTop: Spacing.md }}>
+        <PressableScale onPress={onSecondary} haptic hitSlop={8} scaleTo={0.98} style={{ marginTop: Spacing.md }}>
           <Text variant="label" color={t.primary}>{secondaryLabel}</Text>
-        </Pressable>
+        </PressableScale>
       ) : null}
     </FadeSlide>
   );
@@ -976,9 +991,9 @@ export function SectionHeader({
         </View>
       </View>
       {action && onAction ? (
-        <Pressable onPress={onAction} hitSlop={8}>
+        <PressableScale onPress={onAction} haptic hitSlop={8} scaleTo={0.98}>
           <Text variant="label" color={t.primary}>{action}</Text>
-        </Pressable>
+        </PressableScale>
       ) : null}
     </View>
   );
@@ -1000,17 +1015,20 @@ export function AppHeader({
   title,
   subtitle,
   back,
+  onBack,
   right,
 }: {
   title: string;
   subtitle?: string;
   back?: boolean;
+  /** Override default `router.back()` (e.g. close an in-screen editor). */
+  onBack?: () => void;
   right?: React.ReactNode;
 }) {
   const t = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.lg }}>
-      {back ? <IconButton icon="chevron-back" onPress={() => router.back()} /> : null}
+      {back ? <IconButton icon="chevron-back" onPress={onBack ?? (() => router.back())} /> : null}
       <View style={{ flex: 1 }}>
         <Text variant="title" numberOfLines={1}>{title}</Text>
         {subtitle ? <Text variant="caption" color={t.textSecondary}>{subtitle}</Text> : null}

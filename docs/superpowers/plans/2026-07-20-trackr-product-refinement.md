@@ -181,13 +181,16 @@
 
 ## Verification checklist (ongoing)
 
-- [ ] No `ActivityIndicator` left in product UX paths (grep `ActivityIndicator`)  
-- [ ] Empty CTAs centered on phone + wide  
-- [ ] Day-0 dashboard sparse; expands with data  
-- [ ] Errors never show raw 404/stacks  
+- [x] No `ActivityIndicator` left in product UX paths (grep `ActivityIndicator`)  
+- [ ] Empty CTAs centered on phone + wide (code fixed; device/simulator verify remaining)  
+- [ ] Day-0 dashboard sparse; expands with data (code gated; device/simulator verify remaining)  
+- [x] Errors never show raw 404/stacks (`toUserMessage` + receipt share/print)  
 - [x] Landing + legal offline  
 - [x] Voice backup zip contains audio  
 - [x] SME modules usable end-to-end (not stubs)  
+- [x] Hub EmptyStates use compact layout (Accounting / Marketing / Operations / Profit)  
+- [x] Interactive rows/chips/icon buttons give haptic + press feedback  
+- [x] Marketing template editor back closes editor (does not `router.back` off-screen)  
 
 ---
 

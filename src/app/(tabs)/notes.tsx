@@ -334,7 +334,7 @@ function ConnectionView({
         </Entrance>
       ) : null}
       {groups.length === 0 && unattached.length === 0 ? (
-        <EmptyState icon="git-network-outline" title="Nothing linked yet" message="Attach notes to customers, products or orders from the note editor to see them grouped here." />
+        <EmptyState icon="git-network-outline" title="Nothing linked yet" message="Attach notes to customers, products or orders from the note editor to see them grouped here." compact />
       ) : null}
     </View>
   );

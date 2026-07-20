@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Entrance } from '@/components/anim';
+import { Entrance, PressableScale } from '@/components/anim';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { WIDGET_COMPONENTS, type WidgetProps } from '@/components/dashboard/widgets';
 import { Text } from '@/components/ui';
@@ -32,16 +32,18 @@ export function DashboardRenderer({ widgets, ...props }: { widgets: WidgetKey[] 
 
       {hiddenCount > 0 || canCollapse ? (
         <View style={{ alignItems: 'center', marginBottom: Spacing.xl, paddingTop: Spacing.xs }}>
-          <Pressable
+          <PressableScale
             onPress={() => setShowAll((v) => !v)}
             hitSlop={8}
+            haptic
+            scaleTo={0.98}
             accessibilityRole="button"
             accessibilityLabel={showAll ? 'Show fewer insights' : 'Show more insights'}
           >
             <Text variant="label" color={t.primary}>
               {showAll ? 'Show fewer insights' : `Show more insights${hiddenCount > 0 ? ` (${hiddenCount})` : ''}`}
             </Text>
-          </Pressable>
+          </PressableScale>
         </View>
       ) : null}
     </>

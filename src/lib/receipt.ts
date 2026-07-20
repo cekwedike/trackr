@@ -5,6 +5,7 @@ import * as Sharing from 'expo-sharing';
 import type { Order, OrderItem, Sale, SaleItem } from '@/db/types';
 import { hexToRgba, shade } from '@/lib/color';
 import { formatDateTime } from '@/lib/date';
+import { toUserMessage } from '@/lib/errors';
 import { formatMoney, formatQty } from '@/lib/money';
 
 export type ReceiptKind = 'receipt' | 'invoice';
@@ -253,11 +254,7 @@ function totalRow(label: string, value: string, color: string, strong = false): 
 }
 
 function friendlyError(action: string, error: unknown): void {
-  const detail = error instanceof Error ? error.message : undefined;
-  Alert.alert(
-    `Couldn't ${action}`,
-    detail ? `Something went wrong: ${detail}` : 'Something went wrong. Please try again.',
-  );
+  Alert.alert(`Couldn't ${action}`, toUserMessage(error));
 }
 
 /** Generate a PDF and open the OS share sheet. Falls back gracefully if sharing is unavailable. */

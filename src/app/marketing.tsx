@@ -156,6 +156,7 @@ export default function MarketingScreen() {
               message="Save reusable messages for promos, follow-ups and birthdays."
               actionLabel="New template"
               onAction={() => setEditing('new')}
+              compact
             />
           </Card>
         )}
@@ -295,7 +296,7 @@ function TemplateEditor({
 
   return (
     <Screen>
-      <AppHeader title={initial ? 'Edit template' : 'New template'} back />
+      <AppHeader title={initial ? 'Edit template' : 'New template'} back onBack={onClose} />
       <Card style={{ gap: Spacing.md }}>
         <TextField label="Title" value={title} onChangeText={setTitle} placeholder="e.g. Weekend promo" autoFocus={!initial} />
         <SelectField label="Category" value={category} onPress={() => setCatModal(true)} />

@@ -121,6 +121,7 @@ function VoiceClip({
       </View>
       <Pressable
         onPress={async () => {
+          selectionFeedback();
           try {
             await deleteAttachment(attachment.id);
             onDeleted();
@@ -143,8 +144,8 @@ export function VoiceNoteSection({ noteId }: { noteId: number }) {
   const recorderState = useAudioRecorderState(recorder, 100);
   const [clips, setClips] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
-  const levelsRef = useRef<number[]>(Array.from({ length: 24 }, () => 6));
-  const [levels, setLevels] = useState(levelsRef.current);
+  const [levels, setLevels] = useState(() => Array.from({ length: 24 }, () => 6));
+  const levelsRef = useRef(levels);
 
   const reload = async () => {
     const rows = await listAttachments('note', noteId);
@@ -152,8 +153,15 @@ export function VoiceNoteSection({ noteId }: { noteId: number }) {
   };
 
   useEffect(() => {
-    reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let active = true;
+    (async () => {
+      const rows = await listAttachments('note', noteId);
+      if (!active) return;
+      setClips(rows.filter((r) => (r.mime ?? '').startsWith('audio') || r.uri.includes('voice-')));
+    })();
+    return () => {
+      active = false;
+    };
   }, [noteId]);
 
   useEffect(() => {

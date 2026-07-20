@@ -432,6 +432,7 @@ export default function ProfitScreen() {
             icon="albums-outline"
             title="No months recorded yet"
             message="Record a month above to start building your profit history."
+            compact
           />
         </Card>
       )}

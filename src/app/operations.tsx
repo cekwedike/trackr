@@ -141,6 +141,7 @@ export default function OperationsScreen() {
               onAction={() => router.push('/orders/new')}
               secondaryLabel="Export CSV later"
               onSecondary={() => runExport('orders', exportOrdersCsv)}
+              compact
             />
           </Card>
         )}
@@ -241,6 +242,7 @@ export default function OperationsScreen() {
             message="Set a reminder so nothing slips."
             actionLabel="Add reminder"
             onAction={() => router.push('/reminders/new')}
+            compact
           />
         </Card>
       )}
