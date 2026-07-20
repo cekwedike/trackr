@@ -37,6 +37,7 @@ import {
   notificationsPermissionMessage,
   openAppPermissionSettings,
   requestNotifications,
+  type PermissionOutcome,
 } from '@/lib/permissions';
 import {
   getAllNotifCategories,
@@ -67,6 +68,35 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
 
 function timeLabel(hour: number, minute: number): string {
   return dayjs().hour(hour).minute(minute).format('h:mm A');
+}
+
+/**
+ * Explain why a nudge couldn't be turned on. Distinguishes three cases so we
+ * never tell the user they denied permission when they actually granted it:
+ * - `granted`: permission is on but scheduling failed → neutral, retryable error
+ * - `blocked`: permission is off and can't be re-prompted → deep-link to Settings
+ * - `denied`: user declined the prompt → ask them to enable notifications
+ */
+function alertNudgeScheduleFailure(outcome: PermissionOutcome, nudgeLabel: string): void {
+  if (outcome === 'granted') {
+    Alert.alert(
+      'Couldn’t set reminder',
+      'Notifications are on, but we couldn’t schedule this reminder. Please try again.',
+      [{ text: 'OK' }],
+    );
+    return;
+  }
+  if (outcome === 'blocked') {
+    const msg = notificationsPermissionMessage('blocked');
+    Alert.alert(msg.title, msg.message, [
+      { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
+      { text: 'OK', style: 'cancel' },
+    ]);
+    return;
+  }
+  Alert.alert('Notifications off', `Enable notifications for Trackr to get ${nudgeLabel} nudges.`, [
+    { text: 'OK' },
+  ]);
 }
 
 export default function Settings() {
@@ -252,18 +282,7 @@ export default function Settings() {
           id = await scheduleDailyNudge(dailyHour, dailyMinute);
         }
         if (!id) {
-          const blocked = outcome === 'blocked';
-          const msg = notificationsPermissionMessage(blocked ? 'blocked' : 'denied');
-          Alert.alert(
-            blocked ? msg.title : 'Notifications off',
-            blocked ? msg.message : 'Enable notifications for Trackr to get daily nudges.',
-            blocked
-              ? [
-                  { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
-                  { text: 'OK', style: 'cancel' },
-                ]
-              : [{ text: 'OK' }],
-          );
+          alertNudgeScheduleFailure(outcome, 'daily');
           return;
         }
       }
@@ -295,18 +314,7 @@ export default function Settings() {
           id = await scheduleWeeklyNudge(WEEKLY_NUDGE_WEEKDAY, WEEKLY_NUDGE_HOUR, 0);
         }
         if (!id) {
-          const blocked = outcome === 'blocked';
-          const msg = notificationsPermissionMessage(blocked ? 'blocked' : 'denied');
-          Alert.alert(
-            blocked ? msg.title : 'Notifications off',
-            blocked ? msg.message : 'Enable notifications for Trackr to get weekly nudges.',
-            blocked
-              ? [
-                  { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
-                  { text: 'OK', style: 'cancel' },
-                ]
-              : [{ text: 'OK' }],
-          );
+          alertNudgeScheduleFailure(outcome, 'weekly');
           return;
         }
       }
