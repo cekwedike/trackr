@@ -86,8 +86,7 @@
           "contactsPermission": "Allow Trackr to import contacts into your customer list."
         }
       ],
-      "@react-native-community/datetimepicker",
-      "expo-audio"
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
