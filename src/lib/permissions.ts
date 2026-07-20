@@ -35,6 +35,8 @@ import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert, Linking } from 'react-native';
 
+import * as Notifications from 'expo-notifications';
+
 import {
   getNotificationPermissionState,
   hasNotificationPermission,
@@ -96,11 +98,15 @@ export function confirmPermissionRationale(kind: PermissionKind): Promise<boolea
 export async function requestNotifications(): Promise<PermissionOutcome> {
   if (await hasNotificationPermission()) return 'granted';
   const existing = await getNotificationPermissionState();
-  if (existing.status === 'denied' && !existing.canAskAgain) return 'blocked';
+  if (existing.status === Notifications.PermissionStatus.DENIED && !existing.canAskAgain) {
+    return 'blocked';
+  }
   const granted = await requestNotificationPermission();
   if (granted) return 'granted';
   const after = await getNotificationPermissionState();
-  if (after.status === 'denied' && !after.canAskAgain) return 'blocked';
+  if (after.status === Notifications.PermissionStatus.DENIED && !after.canAskAgain) {
+    return 'blocked';
+  }
   return 'denied';
 }
 
