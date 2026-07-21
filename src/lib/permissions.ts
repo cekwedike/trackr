@@ -20,8 +20,10 @@
  *  - Backup export (expo-sharing): opens the system share sheet only.
  *  - Backup import (expo-document-picker): opens the system document UI only.
  *
- * Mic ownership: `expo-image-picker` keeps `microphonePermission: false` in
- * app.json so only `expo-audio` owns NSMicrophoneUsageDescription / RECORD_AUDIO.
+ * Mic ownership: both `expo-image-picker` and `expo-audio` set a
+ * `microphonePermission` string in app.json (the picker also records video), but
+ * voice notes go through `expo-audio`, so all runtime mic requests in this file
+ * use `expo-audio`'s recording-permission APIs (RECORD_AUDIO).
  *
  * Contacts note: SDK 57 still exposes get/requestPermissionsAsync on the main
  * module (ContactsModule). Prefer those for full-address-book import; single
@@ -204,35 +206,14 @@ export async function openAppPermissionSettings(): Promise<void> {
   }
 }
 
-/** Current photo-library permission without prompting. */
-export async function hasPhotosPermission(): Promise<boolean> {
-  const { granted } = await ImagePicker.getMediaLibraryPermissionsAsync();
-  return granted;
-}
-
 /**
- * Prompt for photo library access (JIT — call only before picking an image).
- * On Android 13+ the system picker may not require this; we still request on iOS
- * and older Android. When already granted (or not needed), returns granted.
+ * Photo-library access is handled inline by the attachment picker in
+ * `src/lib/attachments.ts` (`pickAttachmentImage`), which keeps the OS
+ * permission snapshot fresh across the request→launch flow. The standalone
+ * `requestPhotos`/`hasPhotosPermission` helpers were removed to avoid two
+ * diverging implementations of the same logic; only the shared branded
+ * `photosPermissionMessage` copy lives here.
  */
-export async function requestPhotos(options?: {
-  withRationale?: boolean;
-}): Promise<PermissionOutcome> {
-  const withRationale = options?.withRationale !== false;
-  const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
-  if (existing.granted) return 'granted';
-  // Some Android versions report granted=false but canAskAgain with no real prompt needed
-  // after launchImageLibraryAsync — still attempt a polite request when we can.
-  if (!existing.canAskAgain && existing.status === 'denied') return 'blocked';
-  if (withRationale) {
-    const ok = await confirmPermissionRationale('photos');
-    if (!ok) return 'denied';
-  }
-  const result = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (result.granted) return 'granted';
-  return result.canAskAgain ? 'denied' : 'blocked';
-}
-
 export function photosPermissionMessage(outcome: PermissionOutcome): { title: string; message: string } {
   if (outcome === 'blocked') {
     return {

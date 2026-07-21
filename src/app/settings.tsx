@@ -105,6 +105,33 @@ function alertNudgeScheduleFailure(outcome: PermissionOutcome, nudgeLabel: strin
   });
 }
 
+/**
+ * Explain why a notification category couldn't be turned on. Mirrors
+ * `alertNudgeScheduleFailure`: `blocked` deep-links to system Settings via the
+ * branded confirm dialog; `denied` shows a branded prompt to enable
+ * notifications. Never uses a raw `Alert.alert`.
+ */
+function alertNotifCategoryBlocked(outcome: PermissionOutcome): void {
+  if (outcome === 'blocked') {
+    const msg = notificationsPermissionMessage('blocked');
+    void confirmAsync({
+      title: msg.title,
+      message: msg.message,
+      actions: [
+        { label: 'Open Settings', value: 'settings' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    }).then((choice) => {
+      if (choice === 'settings') void openAppPermissionSettings();
+    });
+    return;
+  }
+  void alertAsync({
+    title: 'Notifications off',
+    message: 'Enable notifications for Trackr to get these alerts.',
+  });
+}
+
 export default function Settings() {
   const t = useTheme();
   const router = useRouter();
@@ -335,6 +362,18 @@ export default function Settings() {
   const toggleNotifCategory = async (cat: NotifCategory) => {
     if (!notifCats) return;
     const next = !notifCats[cat];
+
+    // Enabling a category is meaningless if the OS won't deliver notifications.
+    // Mirror the nudge toggles: request once, and surface a branded blocked/off
+    // prompt instead of silently flipping a switch that does nothing.
+    if (next) {
+      const outcome = await requestNotifications();
+      if (outcome !== 'granted') {
+        alertNotifCategoryBlocked(outcome);
+        return;
+      }
+    }
+
     await setNotifCategoryEnabled(cat, next);
     setNotifCats({ ...notifCats, [cat]: next });
 
