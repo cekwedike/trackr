@@ -15,7 +15,8 @@ import { listSalesForCustomer } from '@/db/repos/sales';
 import type { PaymentMethod } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate, formatDateTime } from '@/lib/date';
+import { formatDateTime } from '@/lib/date';
+import { formatBirthday } from '@/lib/birthday';
 import { pressFeedback } from '@/lib/haptics';
 import { parseMoney } from '@/lib/money';
 
@@ -138,7 +139,7 @@ export default function CustomerDetail() {
     ) : null,
     customer.email ? <InfoRow key="email" label="Email" value={customer.email} align="flex-start" /> : null,
     customer.address ? <InfoRow key="addr" label="Address" value={customer.address} align="flex-start" /> : null,
-    customer.birthday ? <InfoRow key="bday" label="Birthday" value={formatDate(customer.birthday)} /> : null,
+    customer.birthday ? <InfoRow key="bday" label="Birthday" value={formatBirthday(customer.birthday)} /> : null,
     customer.note ? <InfoRow key="note" label="Note" value={customer.note} align="flex-start" /> : null,
   ].filter(Boolean);
 

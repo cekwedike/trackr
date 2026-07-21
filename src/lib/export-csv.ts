@@ -6,6 +6,7 @@ import { listExpenses } from '@/db/repos/expenses';
 import { listOrders } from '@/db/repos/orders';
 import { listProducts } from '@/db/repos/products';
 import { listSales } from '@/db/repos/sales';
+import { formatBirthday } from '@/lib/birthday';
 import { dayjs, formatDate, formatDateTime } from '@/lib/date';
 import { fromMinor } from '@/lib/money';
 
@@ -114,7 +115,7 @@ export function exportCustomersCsv(): Promise<CsvExportResult> {
     { header: 'Name', value: (c) => c.name },
     { header: 'Phone', value: (c) => c.phone },
     { header: 'Email', value: (c) => c.email },
-    { header: 'Birthday', value: (c) => formatDate(c.birthday) },
+    { header: 'Birthday', value: (c) => formatBirthday(c.birthday) },
     { header: 'Address', value: (c) => c.address },
     { header: 'Debt balance', value: (c) => money(c.debt_balance) },
     { header: 'Note', value: (c) => c.note },

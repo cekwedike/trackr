@@ -29,10 +29,22 @@ import {
 import { scheduleBirthdayNotification } from '@/lib/birthday-notifications';
 import { PermissionRationale, requestContacts, type PermissionOutcome } from '@/lib/permissions';
 
+/** A single labelled phone number or email address read from a device contact. */
+export interface ContactMethod {
+  label: string | null;
+  value: string;
+}
+
 export interface ImportableContact {
   id: string;
   name: string;
+  /** All numbers on the contact (deduped). The first is treated as primary. */
+  phones: ContactMethod[];
+  /** All addresses on the contact (deduped). The first is treated as primary. */
+  emails: ContactMethod[];
+  /** Currently-selected phone (defaults to the primary). */
   phone: string | null;
+  /** Currently-selected email (defaults to the primary). */
   email: string | null;
   birthday: string | null;
   alreadyImported: boolean;
@@ -54,8 +66,8 @@ interface ReadableContactDetails {
   fullName?: string | null;
   givenName?: string | null;
   familyName?: string | null;
-  phones?: { number?: string | null }[] | null;
-  emails?: { address?: string | null }[] | null;
+  phones?: { number?: string | null; label?: string | null }[] | null;
+  emails?: { address?: string | null; label?: string | null }[] | null;
   birthday?: ContactDate | null;
   dates?: ExistingDate[] | null;
 }
@@ -64,15 +76,24 @@ function logContactsError(op: string, error: unknown): void {
   if (__DEV__) console.warn(`[contacts-import] ${op} failed:`, error);
 }
 
-function birthdayToIso(bd: ContactDate | null | undefined): string | null {
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/**
+ * Serialise a native ContactDate to storage. When the source has no real year
+ * (day + month only — very common on phones) we DON'T invent one: store the ISO
+ * 8601 recurring form `--MM-DD`. When a real year exists, store `YYYY-MM-DD`.
+ */
+function contactDateToStored(bd: ContactDate | null | undefined): string | null {
   if (!bd || bd.month == null || bd.day == null) return null;
   // ContactDate.month is 1–12
-  const year = bd.year && bd.year > 0 ? bd.year : 2000;
   const month = Math.max(1, Math.min(12, bd.month));
   const day = Math.max(1, Math.min(31, bd.day));
-  const d = new Date(year, month - 1, day, 12, 0, 0);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
+  if (!bd.year || bd.year <= 0) {
+    return `--${pad2(month)}-${pad2(day)}`;
+  }
+  return `${bd.year}-${pad2(month)}-${pad2(day)}`;
 }
 
 /**
@@ -80,9 +101,26 @@ function birthdayToIso(bd: ContactDate | null | undefined): string | null {
  * `birthday`; Android returns it inside `dates` as the event labelled "birthday".
  */
 function birthdayFromDetails(det: ReadableContactDetails): string | null {
-  if (det.birthday) return birthdayToIso(det.birthday);
+  if (det.birthday) return contactDateToStored(det.birthday);
   const birthday = (det.dates ?? []).find((d) => (d.label ?? '').toLowerCase() === 'birthday');
-  return birthday?.date ? birthdayToIso(birthday.date) : null;
+  return birthday?.date ? contactDateToStored(birthday.date) : null;
+}
+
+/** Normalise a labelled list (phones/emails), trimming blanks and de-duping by value. */
+function toMethods(
+  raw: { number?: string | null; address?: string | null; label?: string | null }[] | null | undefined,
+): ContactMethod[] {
+  const seen = new Set<string>();
+  const out: ContactMethod[] = [];
+  for (const item of raw ?? []) {
+    const value = (item.number ?? item.address ?? '').trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ label: item.label?.trim() || null, value });
+  }
+  return out;
 }
 
 /** Map raw contact details into the fields Trackr cares about (no DB access). */
@@ -91,11 +129,15 @@ function mapDetails(det: ReadableContactDetails): Omit<ImportableContact, 'alrea
     det.fullName?.trim() ||
     [det.givenName, det.familyName].filter(Boolean).join(' ').trim() ||
     'Unnamed contact';
+  const phones = toMethods(det.phones);
+  const emails = toMethods(det.emails);
   return {
     id: det.id,
     name,
-    phone: det.phones?.[0]?.number ?? null,
-    email: det.emails?.[0]?.address ?? null,
+    phones,
+    emails,
+    phone: phones[0]?.value ?? null,
+    email: emails[0]?.value ?? null,
     birthday: birthdayFromDetails(det),
   };
 }

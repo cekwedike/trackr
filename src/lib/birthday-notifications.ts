@@ -7,7 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import type { Customer } from '@/db/types';
-import { dayjs } from '@/lib/date';
+import { parseBirthday } from '@/lib/birthday';
 import { getNotifCategoryEnabled } from '@/lib/notification-prefs';
 import {
   BRAND_COLOR,
@@ -79,8 +79,10 @@ export async function scheduleBirthdayNotification(
   // Spec §12: CRM / birthday alerts default off until the user enables them.
   if (!(await getNotifCategoryEnabled('crm'))) return null;
 
-  const bd = dayjs(customer.birthday);
-  if (!bd.isValid()) return null;
+  // Birthdays recur yearly, so we only need month + day. Parse handles both
+  // `YYYY-MM-DD` / full ISO and the year-less `--MM-DD` form (day + month only).
+  const bd = parseBirthday(customer.birthday);
+  if (!bd) return null;
 
   try {
     ensureNotificationHandler();
@@ -88,7 +90,7 @@ export async function scheduleBirthdayNotification(
     const granted = await requestNotificationPermission();
     if (!granted) return null;
 
-    // YearlyTriggerInput month is JS Date range (0 = January). dayjs month() is also 0-based.
+    // YearlyTriggerInput month is JS Date range (0 = January); parseBirthday is 1-based.
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: `Birthday: ${customer.name}`,
@@ -99,8 +101,8 @@ export async function scheduleBirthdayNotification(
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.YEARLY,
-        month: bd.month(),
-        day: bd.date(),
+        month: bd.month - 1,
+        day: bd.day,
         hour,
         minute,
         channelId: CRM_CHANNEL_ID,

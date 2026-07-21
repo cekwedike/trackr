@@ -16,6 +16,7 @@ import {
   cancelBirthdayNotification,
   scheduleBirthdayNotification,
 } from '@/lib/birthday-notifications';
+import { birthdayToDate, isYearlessBirthday, toYearlessBirthday } from '@/lib/birthday';
 import {
   contactsPermissionMessage,
   openSystemSettings,
@@ -37,7 +38,11 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
   const [note, setNote] = useState(initial?.note ?? '');
   const [debt, setDebt] = useState(initial ? String(fromMinor(initial.debt_balance)) : '0');
   const [hasBirthday, setHasBirthday] = useState(!!initial?.birthday);
-  const [birthday, setBirthday] = useState(initial?.birthday ? new Date(initial.birthday) : new Date(2000, 0, 1));
+  const [birthday, setBirthday] = useState(birthdayToDate(initial?.birthday) ?? new Date(2000, 0, 1));
+  // Track whether the current birthday has no year (e.g. imported from a contact
+  // that only had day + month) so we don't fabricate a year when saving. Any
+  // manual edit via the date picker adopts a concrete (full) date.
+  const [birthdayYearless, setBirthdayYearless] = useState(isYearlessBirthday(initial?.birthday));
   const [contactId, setContactId] = useState<string | null>(initial?.contact_id ?? null);
   const [saving, setSaving] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
@@ -71,8 +76,12 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
       setEmail(c.email ?? '');
       setContactId(c.id);
       if (c.birthday) {
-        setHasBirthday(true);
-        setBirthday(new Date(c.birthday));
+        const d = birthdayToDate(c.birthday);
+        if (d) {
+          setHasBirthday(true);
+          setBirthday(d);
+          setBirthdayYearless(isYearlessBirthday(c.birthday));
+        }
       }
     } catch (e) {
       void alert({ title: 'Couldn’t open contacts', message: toUserMessage(e) });
@@ -92,7 +101,11 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
         name: name.trim(),
         phone: phone.trim() || null,
         email: email.trim() || null,
-        birthday: hasBirthday ? birthday.toISOString() : null,
+        birthday: hasBirthday
+          ? birthdayYearless
+            ? toYearlessBirthday(birthday)
+            : birthday.toISOString()
+          : null,
         address: address.trim() || null,
         note: note.trim() || null,
         debt_balance: parseMoney(debt),
@@ -164,23 +177,23 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
       {!initial ? (
         <Card style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
           <Button
-            title={importBusy ? 'Opening contacts…' : 'Import from contacts'}
+            title="Import from contacts"
             icon="people-outline"
             variant="secondary"
             size="lg"
-            onPress={importFromContacts}
-            disabled={importBusy || saving}
-          />
-          <Button
-            title="Import many…"
-            icon="download-outline"
-            variant="ghost"
-            size="sm"
             onPress={() => router.push('/customers/import')}
             disabled={importBusy || saving}
           />
+          <Button
+            title={importBusy ? 'Opening contacts…' : 'Fill this form from a contact'}
+            icon="person-add-outline"
+            variant="ghost"
+            size="sm"
+            onPress={importFromContacts}
+            disabled={importBusy || saving}
+          />
           <Text variant="caption" color={t.textMuted}>
-            Pick someone from your phone book to fill this form, or import several at once.
+            Select several people at once, or pick just one to fill in this form.
           </Text>
         </Card>
       ) : null}
@@ -199,7 +212,17 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
           </View>
           <Toggle value={hasBirthday} onValueChange={setHasBirthday} />
         </View>
-        {hasBirthday ? <DateTimeField value={birthday} onChange={setBirthday} mode="date" /> : null}
+        {hasBirthday ? (
+          <DateTimeField
+            value={birthday}
+            onChange={(d) => {
+              setBirthday(d);
+              // A manual pick includes a year, so stop treating it as year-less.
+              setBirthdayYearless(false);
+            }}
+            mode="date"
+          />
+        ) : null}
       </Card>
 
       <SectionHeader title="Financial" style={{ marginTop: Spacing.lg }} />

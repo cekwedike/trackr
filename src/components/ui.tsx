@@ -18,11 +18,13 @@ import {
   type KeyboardTypeOptions,
 } from 'react-native';
 import Animated, {
+  Easing,
   useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withRepeat,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -72,6 +74,45 @@ export function Brand({
           {subtitle ? <Text variant="caption" color={t.textSecondary}>{subtitle}</Text> : null}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * Branded, on-brand loading indicator: a gently pulsing app logo instead of a
+ * generic spinner. Use anywhere content is loading (lists, screens). Respects
+ * reduced-motion by holding the logo static.
+ */
+export function BrandLoading({
+  label,
+  size = 56,
+  style,
+}: {
+  label?: string;
+  size?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const t = useTheme();
+  const reduced = useReducedMotion();
+  const pulse = useSharedValue(0);
+  React.useEffect(() => {
+    if (reduced) return;
+    pulse.value = withRepeat(withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.quad) }), -1, true);
+  }, [pulse, reduced]);
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + pulse.value * 0.08 }],
+    opacity: 0.8 + pulse.value * 0.2,
+  }));
+  return (
+    <View style={[{ alignItems: 'center', justifyContent: 'center', gap: Spacing.md, paddingVertical: Spacing.xxxl }, style]}>
+      <Animated.View style={logoStyle}>
+        <Image
+          source={APP_ICON}
+          style={{ width: size, height: size, borderRadius: Math.round(size * 0.26) }}
+          contentFit="cover"
+        />
+      </Animated.View>
+      {label ? <Text variant="caption" color={t.textMuted}>{label}</Text> : null}
     </View>
   );
 }

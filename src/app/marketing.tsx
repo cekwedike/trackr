@@ -47,7 +47,8 @@ import {
 import type { MessageTemplate } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
-import { dayjs, formatDate } from '@/lib/date';
+import { formatBirthday, parseBirthday } from '@/lib/birthday';
+import { dayjs } from '@/lib/date';
 import { toUserMessage } from '@/lib/errors';
 
 export default function MarketingScreen() {
@@ -68,10 +69,14 @@ export default function MarketingScreen() {
       listMarketingIdeas(),
       listCustomers(),
     ]);
-    const month = dayjs().month();
+    const month = dayjs().month() + 1; // 1-based to match parseBirthday
     const birthdays = customers
-      .filter((c) => c.birthday && dayjs(c.birthday).isValid() && dayjs(c.birthday).month() === month)
-      .sort((a, b) => dayjs(a.birthday!).date() - dayjs(b.birthday!).date());
+      .map((c) => ({ c, bd: parseBirthday(c.birthday) }))
+      .filter((x): x is { c: (typeof customers)[number]; bd: NonNullable<ReturnType<typeof parseBirthday>> } =>
+        x.bd != null && x.bd.month === month,
+      )
+      .sort((a, b) => a.bd.day - b.bd.day)
+      .map((x) => x.c);
     return { templates, ideas, birthdays };
   }, []);
 
@@ -114,7 +119,7 @@ export default function MarketingScreen() {
                     icon="gift"
                     iconTone="accent"
                     title={c.name}
-                    subtitle={formatDate(c.birthday)}
+                    subtitle={formatBirthday(c.birthday)}
                     onPress={() => router.push(`/customers/${c.id}`)}
                     right={<Chip label="Open" tone="primary" />}
                   />
