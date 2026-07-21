@@ -71,7 +71,7 @@
         {
           "photosPermission": "Allow Trackr to attach photos to your products and records.",
           "cameraPermission": "Allow Trackr to take photos for your products and records.",
-          "microphonePermission": false
+          "microphonePermission": "Allow Trackr to record voice notes for your business."
         }
       ],
       [
