@@ -299,6 +299,26 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_message_templates_updated ON message_templates(updated_at);
   CREATE INDEX IF NOT EXISTS idx_marketing_ideas_sort ON marketing_ideas(sort_order, id);
   `,
+  // v8: location tagging (foreground-only GPS) + product barcode lookup
+  `
+  ALTER TABLE sales ADD COLUMN lat REAL;
+  ALTER TABLE sales ADD COLUMN lng REAL;
+  ALTER TABLE sales ADD COLUMN location_label TEXT;
+
+  ALTER TABLE expenses ADD COLUMN lat REAL;
+  ALTER TABLE expenses ADD COLUMN lng REAL;
+  ALTER TABLE expenses ADD COLUMN location_label TEXT;
+
+  ALTER TABLE customers ADD COLUMN lat REAL;
+  ALTER TABLE customers ADD COLUMN lng REAL;
+
+  ALTER TABLE settings ADD COLUMN business_lat REAL;
+  ALTER TABLE settings ADD COLUMN business_lng REAL;
+  ALTER TABLE settings ADD COLUMN business_location_label TEXT;
+
+  ALTER TABLE products ADD COLUMN barcode TEXT;
+  CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
+  `,
 ];
 
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {

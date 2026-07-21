@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { useAlert, useConfirm } from '@/components/confirm';
+import { LocationField, type LocationValue } from '@/components/location-field';
 import { useUndo } from '@/components/undo';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { DateTimeField } from '@/components/pickers';
@@ -23,6 +24,7 @@ import {
   pickContactFields,
 } from '@/lib/contacts-import';
 import { toUserMessage } from '@/lib/errors';
+import { reverseGeocodeAddress, type CapturedLocation } from '@/lib/location';
 import { fromMinor, parseMoney } from '@/lib/money';
 
 export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?: () => void }) {
@@ -44,8 +46,21 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
   // manual edit via the date picker adopts a concrete (full) date.
   const [birthdayYearless, setBirthdayYearless] = useState(isYearlessBirthday(initial?.birthday));
   const [contactId, setContactId] = useState<string | null>(initial?.contact_id ?? null);
+  const [location, setLocation] = useState<LocationValue>(
+    initial?.lat != null && initial?.lng != null
+      ? { lat: initial.lat, lng: initial.lng, label: initial.address ?? null }
+      : null,
+  );
   const [saving, setSaving] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
+
+  // After a fresh capture, offer to fill the address from the coordinate when
+  // it's still empty (never overwrite an address the user already typed).
+  const onLocationCaptured = async (captured: CapturedLocation) => {
+    if (address.trim()) return;
+    const resolved = (await reverseGeocodeAddress(captured.lat, captured.lng)) ?? captured.label;
+    if (resolved) setAddress(resolved);
+  };
 
   const importFromContacts = async () => {
     if (importBusy) return;
@@ -110,6 +125,8 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
         note: note.trim() || null,
         debt_balance: parseMoney(debt),
         contact_id: contactId,
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
       };
       let id = initial?.id;
       if (initial) await updateCustomer(initial.id, payload);
@@ -161,6 +178,8 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
             note: snap.note,
             debt_balance: snap.debt_balance,
             contact_id: snap.contact_id,
+            lat: snap.lat,
+            lng: snap.lng,
           });
           if (snap.birthday) {
             await scheduleBirthdayNotification({ id, name: snap.name, birthday: snap.birthday });
@@ -204,6 +223,12 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
         <TextField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="080..." />
         <TextField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="Optional" />
         <TextField label="Address" value={address} onChangeText={setAddress} placeholder="Optional" />
+        <LocationField
+          label="Location (optional)"
+          value={location}
+          onChange={setLocation}
+          onCaptured={onLocationCaptured}
+        />
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>

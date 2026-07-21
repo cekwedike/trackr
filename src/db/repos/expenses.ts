@@ -11,6 +11,9 @@ export interface ExpenseInput {
   payment_method?: string | null;
   /** Optional VAT/tax percent (e.g. 7.5). Stored for reporting; amount stays tax-inclusive cash. */
   tax_rate?: number | null;
+  lat?: number | null;
+  lng?: number | null;
+  location_label?: string | null;
 }
 
 export const EXPENSE_CATEGORIES = [
@@ -39,8 +42,8 @@ export async function getExpense(id: number): Promise<Expense | null> {
 export async function createExpense(input: ExpenseInput): Promise<number> {
   const db = await getDb();
   const res = await db.runAsync(
-    `INSERT INTO expenses (occurred_at, amount, description, category, payment_method, tax_rate, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO expenses (occurred_at, amount, description, category, payment_method, tax_rate, lat, lng, location_label, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.occurred_at,
       input.amount,
@@ -48,6 +51,9 @@ export async function createExpense(input: ExpenseInput): Promise<number> {
       input.category ?? null,
       input.payment_method ?? null,
       input.tax_rate ?? 0,
+      input.lat ?? null,
+      input.lng ?? null,
+      input.location_label ?? null,
       nowIso(),
     ],
   );
@@ -58,7 +64,7 @@ export async function createExpense(input: ExpenseInput): Promise<number> {
 export async function updateExpense(id: number, input: ExpenseInput): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE expenses SET occurred_at = ?, amount = ?, description = ?, category = ?, payment_method = ?, tax_rate = ? WHERE id = ?`,
+    `UPDATE expenses SET occurred_at = ?, amount = ?, description = ?, category = ?, payment_method = ?, tax_rate = ?, lat = ?, lng = ?, location_label = ? WHERE id = ?`,
     [
       input.occurred_at,
       input.amount,
@@ -66,6 +72,9 @@ export async function updateExpense(id: number, input: ExpenseInput): Promise<vo
       input.category ?? null,
       input.payment_method ?? null,
       input.tax_rate ?? 0,
+      input.lat ?? null,
+      input.lng ?? null,
+      input.location_label ?? null,
       id,
     ],
   );

@@ -14,6 +14,7 @@ export interface ProductInput {
   low_stock_threshold: number;
   image_uri?: string | null;
   notes?: string | null;
+  barcode?: string | null;
 }
 
 export async function listProducts(includeInactive = false): Promise<Product[]> {
@@ -27,12 +28,23 @@ export async function getProduct(id: number): Promise<Product | null> {
   return db.getFirstAsync<Product>('SELECT * FROM products WHERE id = ?', [id]);
 }
 
+/** Find an active product by exact scanned barcode value (newest match wins). */
+export async function findProductByBarcode(barcode: string): Promise<Product | null> {
+  const value = barcode.trim();
+  if (!value) return null;
+  const db = await getDb();
+  return db.getFirstAsync<Product>(
+    'SELECT * FROM products WHERE is_active = 1 AND barcode = ? ORDER BY id DESC LIMIT 1',
+    [value],
+  );
+}
+
 export async function createProduct(input: ProductInput): Promise<number> {
   const db = await getDb();
   const now = nowIso();
   const res = await db.runAsync(
-    `INSERT INTO products (name, category, sku, price, cost, stock, unit, low_stock_threshold, image_uri, notes, is_active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    `INSERT INTO products (name, category, sku, price, cost, stock, unit, low_stock_threshold, image_uri, notes, barcode, is_active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     [
       input.name,
       input.category ?? null,
@@ -44,6 +56,7 @@ export async function createProduct(input: ProductInput): Promise<number> {
       input.low_stock_threshold,
       input.image_uri ?? null,
       input.notes ?? null,
+      input.barcode ?? null,
       now,
       now,
     ],
@@ -55,7 +68,7 @@ export async function createProduct(input: ProductInput): Promise<number> {
 export async function updateProduct(id: number, input: ProductInput): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE products SET name = ?, category = ?, sku = ?, price = ?, cost = ?, stock = ?, unit = ?, low_stock_threshold = ?, image_uri = ?, notes = ?, updated_at = ? WHERE id = ?`,
+    `UPDATE products SET name = ?, category = ?, sku = ?, price = ?, cost = ?, stock = ?, unit = ?, low_stock_threshold = ?, image_uri = ?, notes = ?, barcode = ?, updated_at = ? WHERE id = ?`,
     [
       input.name,
       input.category ?? null,
@@ -67,6 +80,7 @@ export async function updateProduct(id: number, input: ProductInput): Promise<vo
       input.low_stock_threshold,
       input.image_uri ?? null,
       input.notes ?? null,
+      input.barcode ?? null,
       nowIso(),
       id,
     ],

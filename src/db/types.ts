@@ -14,6 +14,10 @@ export interface Settings {
   lock_enabled: number;
   biometric_enabled: number;
   onboarded: number;
+  /** Optional saved store/business location (foreground GPS capture). */
+  business_lat: number | null;
+  business_lng: number | null;
+  business_location_label: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,6 +64,8 @@ export interface Product {
   low_stock_threshold: number;
   image_uri: string | null;
   notes: string | null;
+  /** Optional scanned barcode/QR value for quick lookup at the till. */
+  barcode: string | null;
   is_active: number;
   created_at: string;
   updated_at: string;
@@ -107,6 +113,9 @@ export interface Customer {
   debt_balance: number;
   /** Device contacts id when imported — used for occasional re-sync. */
   contact_id: string | null;
+  /** Optional saved location for the customer (auto-fills address / maps). */
+  lat: number | null;
+  lng: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -119,6 +128,10 @@ export interface Sale {
   total: number;
   cost_total: number;
   note: string | null;
+  /** Optional location where the sale happened (foreground GPS capture). */
+  lat: number | null;
+  lng: number | null;
+  location_label: string | null;
   created_at: string;
 }
 
@@ -142,6 +155,10 @@ export interface Expense {
   payment_method: string | null;
   /** Optional VAT/tax percent applied for reporting (0 = none). */
   tax_rate: number;
+  /** Optional location where the expense happened (foreground GPS capture). */
+  lat: number | null;
+  lng: number | null;
+  location_label: string | null;
   created_at: string;
 }
 

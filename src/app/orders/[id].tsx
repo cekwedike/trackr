@@ -8,15 +8,18 @@ import { SelectField, SelectModal } from '@/components/pickers';
 import { AppHeader, Button, Card, DetailHero, Divider, IconButton, InfoRow, Screen, SectionHeader, Segmented, Text, TextField } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
+import { getCustomer } from '@/db/repos/customers';
 import { getOrder, getOrderItems, ORDER_STATUSES, setOrderStatus } from '@/db/repos/orders';
 import { listPayments, recordOrderPayment } from '@/db/repos/payments';
 import type { OrderStatus, PaymentMethod } from '@/db/types';
 import { useAsyncData } from '@/hooks/use-async-data';
 import { useTheme } from '@/hooks/use-theme';
+import { addToCalendar } from '@/lib/calendar';
 import { formatDate, formatDateTime } from '@/lib/date';
 import { pressFeedback } from '@/lib/haptics';
 import { parseMoney } from '@/lib/money';
-import { orderToReceipt, printReceipt, shareReceipt } from '@/lib/receipt';
+import { orderToReceipt, printReceipt, receiptSmsText, shareReceipt } from '@/lib/receipt';
+import { composeSms } from '@/lib/sms';
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -44,7 +47,8 @@ export default function OrderDetail() {
     if (!order) return null;
     const items = await getOrderItems(orderId);
     const payments = await listPayments('order', orderId);
-    return { order, items, payments };
+    const customer = order.customer_id ? await getCustomer(order.customer_id) : null;
+    return { order, items, payments, customer };
   }, [orderId]);
 
   if (!data) {
@@ -58,7 +62,7 @@ export default function OrderDetail() {
   }
   if (editing) return <OrderForm initial={data.order} onDone={() => { setEditing(false); reload(); }} />;
 
-  const { order, items, payments } = data;
+  const { order, items, payments, customer } = data;
   const balance = order.total - order.amount_paid;
 
   const changeStatus = async (s: OrderStatus) => {
@@ -122,6 +126,13 @@ export default function OrderDetail() {
   const onPrint = () => {
     pressFeedback();
     printReceipt(buildData());
+  };
+
+  const onText = async () => {
+    if (!customer?.phone) return;
+    pressFeedback();
+    const opened = await composeSms(customer.phone, receiptSmsText(buildData()));
+    if (!opened) await shareReceipt(buildData());
   };
 
   const statusLabel = ORDER_STATUSES.find((s) => s.value === order.status)?.label;
@@ -222,6 +233,26 @@ export default function OrderDetail() {
         <Button title="Send invoice" icon="share-social-outline" onPress={onShare} loading={sharing} style={{ flex: 1 }} />
         <Button title="Print" variant="secondary" icon="print-outline" onPress={onPrint} style={{ flex: 1 }} />
       </View>
+      {customer?.phone ? (
+        <Button title="Text invoice" variant="secondary" icon="chatbox-ellipses-outline" onPress={onText} style={{ marginTop: Spacing.sm }} />
+      ) : null}
+      {order.due_at ? (
+        <Button
+          title="Add due date to calendar"
+          variant="secondary"
+          icon="calendar-outline"
+          onPress={() => {
+            pressFeedback();
+            void addToCalendar({
+              title: `${terms.order} due${order.customer_name ? ` — ${order.customer_name}` : ''}`,
+              startDate: new Date(order.due_at!),
+              notes: `${money(order.total)} total · ${money(balance)} balance${order.note ? `\n${order.note}` : ''}`,
+              location: settings?.business_location_label ?? null,
+            });
+          }}
+          style={{ marginTop: Spacing.sm }}
+        />
+      ) : null}
 
       <SelectModal
         visible={methodModal}

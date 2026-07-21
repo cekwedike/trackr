@@ -12,6 +12,8 @@ export interface CustomerInput {
   note?: string | null;
   debt_balance?: number;
   contact_id?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export async function listCustomers(): Promise<Customer[]> {
@@ -28,8 +30,8 @@ export async function createCustomer(input: CustomerInput): Promise<number> {
   const db = await getDb();
   const now = nowIso();
   const res = await db.runAsync(
-    `INSERT INTO customers (name, phone, email, birthday, address, note, debt_balance, contact_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO customers (name, phone, email, birthday, address, note, debt_balance, contact_id, lat, lng, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.name,
       input.phone ?? null,
@@ -39,6 +41,8 @@ export async function createCustomer(input: CustomerInput): Promise<number> {
       input.note ?? null,
       input.debt_balance ?? 0,
       input.contact_id ?? null,
+      input.lat ?? null,
+      input.lng ?? null,
       now,
       now,
     ],
@@ -50,7 +54,7 @@ export async function createCustomer(input: CustomerInput): Promise<number> {
 export async function updateCustomer(id: number, input: CustomerInput): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    `UPDATE customers SET name = ?, phone = ?, email = ?, birthday = ?, address = ?, note = ?, debt_balance = ?, contact_id = ?, updated_at = ? WHERE id = ?`,
+    `UPDATE customers SET name = ?, phone = ?, email = ?, birthday = ?, address = ?, note = ?, debt_balance = ?, contact_id = ?, lat = ?, lng = ?, updated_at = ? WHERE id = ?`,
     [
       input.name,
       input.phone ?? null,
@@ -60,6 +64,8 @@ export async function updateCustomer(id: number, input: CustomerInput): Promise<
       input.note ?? null,
       input.debt_balance ?? 0,
       input.contact_id ?? null,
+      input.lat ?? null,
+      input.lng ?? null,
       nowIso(),
       id,
     ],

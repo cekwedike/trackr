@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { useAlert, useConfirm } from '@/components/confirm';
@@ -16,10 +16,11 @@ import { useTheme } from '@/hooks/use-theme';
 import { pickOrCaptureAttachmentImage } from '@/lib/attachments';
 import { toUserMessage } from '@/lib/errors';
 import { fromMinor, formatQty, parseMoney } from '@/lib/money';
+import { consumeScannedBarcode } from '@/lib/scan-bridge';
 
 const UNITS = ['pcs', 'pack', 'box', 'kg', 'g', 'litre', 'ml', 'plate', 'bottle', 'bag'];
 
-export function ProductForm({ initial }: { initial?: Product }) {
+export function ProductForm({ initial, initialBarcode }: { initial?: Product; initialBarcode?: string }) {
   const t = useTheme();
   const confirm = useConfirm();
   const alert = useAlert();
@@ -34,10 +35,19 @@ export function ProductForm({ initial }: { initial?: Product }) {
   const [unit, setUnit] = useState(initial?.unit ?? 'pcs');
   const [threshold, setThreshold] = useState(initial ? String(initial.low_stock_threshold) : '0');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [barcode, setBarcode] = useState(initial?.barcode ?? initialBarcode ?? '');
   const [image, setImage] = useState<string | null>(initial?.image_uri ?? null);
   const [unitModal, setUnitModal] = useState(false);
   const [adjustQty, setAdjustQty] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Pick up a code scanned on the /scan screen when we regain focus.
+  useFocusEffect(
+    useCallback(() => {
+      const scanned = consumeScannedBarcode();
+      if (scanned) setBarcode(scanned);
+    }, []),
+  );
 
   const pickImage = async () => {
     const picked = await pickOrCaptureAttachmentImage();
@@ -70,6 +80,7 @@ export function ProductForm({ initial }: { initial?: Product }) {
         low_stock_threshold: parseFloat(threshold) || 0,
         image_uri: image,
         notes: notes.trim() || null,
+        barcode: barcode.trim() || null,
       };
       if (initial) await updateProduct(initial.id, payload);
       else await createProduct(payload);
@@ -112,6 +123,7 @@ export function ProductForm({ initial }: { initial?: Product }) {
             low_stock_threshold: snap.low_stock_threshold,
             image_uri: snap.image_uri,
             notes: snap.notes,
+            barcode: snap.barcode,
           }),
       });
     }
@@ -174,6 +186,29 @@ export function ProductForm({ initial }: { initial?: Product }) {
             </View>
           </View>
         ) : null}
+      </Card>
+
+      <SectionHeader title="Barcode" />
+      <Card style={{ gap: Spacing.md }}>
+        <TextField
+          label="Barcode / QR value"
+          value={barcode}
+          onChangeText={setBarcode}
+          placeholder="Scan or type a code"
+          right={
+            barcode ? (
+              <Pressable onPress={() => setBarcode('')} hitSlop={8}>
+                <Text variant="label" color={t.textMuted}>Clear</Text>
+              </Pressable>
+            ) : undefined
+          }
+        />
+        <Button
+          title="Scan barcode"
+          icon="scan-outline"
+          variant="secondary"
+          onPress={() => router.push('/scan?mode=capture')}
+        />
       </Card>
 
       <SectionHeader title="Notes" />

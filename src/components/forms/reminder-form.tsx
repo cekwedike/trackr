@@ -8,6 +8,7 @@ import { Spacing } from '@/constants/theme';
 import { createReminder, updateReminder } from '@/db/repos/reminders';
 import type { Recurrence, Reminder } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
+import { addToCalendar } from '@/lib/calendar';
 import { toUserMessage } from '@/lib/errors';
 import { cancelReminder, scheduleReminder } from '@/lib/notifications';
 
@@ -110,6 +111,15 @@ export function ReminderForm({ initial, onDone }: { initial?: Reminder; onDone?:
         loading={saving}
         size="lg"
         style={{ marginTop: Spacing.lg }}
+      />
+      <Button
+        title="Add to calendar"
+        icon="calendar-outline"
+        variant="secondary"
+        onPress={() =>
+          addToCalendar({ title: title.trim() || 'Reminder', startDate: due, notes: body.trim() || null })
+        }
+        style={{ marginTop: Spacing.md }}
       />
 
       <SelectModal

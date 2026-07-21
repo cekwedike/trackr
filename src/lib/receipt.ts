@@ -307,6 +307,26 @@ export async function shareReceipt(data: ReceiptData): Promise<void> {
   }
 }
 
+/**
+ * A concise plain-text summary of a receipt/invoice, suitable for prefilling an
+ * SMS composer. Keeps it short (one screen) — the full document is the PDF.
+ */
+export function receiptSmsText(data: ReceiptData): string {
+  const money = (minor: number) => formatMoney(minor, data.currencySymbol);
+  const label = data.kind === 'invoice' ? 'Invoice' : 'Receipt';
+  const prefix = data.kind === 'invoice' ? 'INV' : 'RCT';
+  const lines = [
+    `${data.businessName} — ${label} ${prefix}-${data.number}`,
+    `Date: ${data.dateLabel}`,
+    `Total: ${money(data.total)}`,
+  ];
+  if (data.balanceDue != null && data.balanceDue > 0) {
+    lines.push(`Balance due: ${money(data.balanceDue)}`);
+  }
+  lines.push('Thank you!');
+  return lines.join('\n');
+}
+
 /** Send the document straight to the native print dialog (AirPrint / Android print). */
 export async function printReceipt(data: ReceiptData): Promise<void> {
   try {

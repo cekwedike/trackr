@@ -19,7 +19,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { pickOrCaptureAttachmentImage } from '@/lib/attachments';
 import { formatDateTime } from '@/lib/date';
 import { pressFeedback } from '@/lib/haptics';
-import { printReceipt, saleToReceipt, shareReceipt } from '@/lib/receipt';
+import { printReceipt, receiptSmsText, saleToReceipt, shareReceipt } from '@/lib/receipt';
+import { composeSms } from '@/lib/sms';
 
 export default function SaleDetail() {
   const t = useTheme();
@@ -117,6 +118,13 @@ export default function SaleDetail() {
     printReceipt(buildData());
   };
 
+  const onText = async () => {
+    if (!customer?.phone) return;
+    pressFeedback();
+    const opened = await composeSms(customer.phone, receiptSmsText(buildData()));
+    if (!opened) await shareReceipt(buildData());
+  };
+
   const detailRows = [
     <InfoRow key="date" label="Date" value={formatDateTime(sale.occurred_at)} />,
     <InfoRow key="pay" label="Payment" value={PAYMENT_LABEL[sale.payment_method] ?? sale.payment_method} />,
@@ -182,6 +190,9 @@ export default function SaleDetail() {
         <Button title="Share receipt" icon="share-social-outline" onPress={onShare} loading={sharing} style={{ flex: 1 }} />
         <Button title="Print" variant="secondary" icon="print-outline" onPress={onPrint} style={{ flex: 1 }} />
       </View>
+      {customer?.phone ? (
+        <Button title="Text receipt" variant="secondary" icon="chatbox-ellipses-outline" onPress={onText} style={{ marginTop: Spacing.sm }} />
+      ) : null}
 
       <Button title="Done" variant="ghost" onPress={() => router.back()} style={{ marginTop: Spacing.sm }} />
     </Screen>

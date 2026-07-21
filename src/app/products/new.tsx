@@ -1,5 +1,8 @@
+import { useLocalSearchParams } from 'expo-router';
+
 import { ProductForm } from '@/components/forms/product-form';
 
 export default function NewProduct() {
-  return <ProductForm />;
+  const { barcode } = useLocalSearchParams<{ barcode?: string }>();
+  return <ProductForm initialBarcode={barcode} />;
 }

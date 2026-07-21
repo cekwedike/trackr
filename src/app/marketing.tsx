@@ -50,6 +50,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatBirthday, parseBirthday } from '@/lib/birthday';
 import { dayjs } from '@/lib/date';
 import { toUserMessage } from '@/lib/errors';
+import { composeSms } from '@/lib/sms';
 
 export default function MarketingScreen() {
   const t = useTheme();
@@ -88,6 +89,19 @@ export default function MarketingScreen() {
     }
   };
 
+  /** Open the system SMS composer prefilled; fall back to the share sheet. */
+  const sendSms = async (body: string, title: string, addresses: string | string[] = []) => {
+    try {
+      const opened = await composeSms(addresses, body);
+      if (!opened) {
+        void alert({ title: 'SMS not available', message: 'This device can’t send SMS, so we opened sharing instead.' });
+        await Share.share({ message: body, title });
+      }
+    } catch (e) {
+      void alert({ title: 'Couldn’t open SMS', message: toUserMessage(e, 'Try again in a moment.') });
+    }
+  };
+
   if (editing !== null) {
     return (
       <TemplateEditor
@@ -121,7 +135,19 @@ export default function MarketingScreen() {
                     title={c.name}
                     subtitle={formatBirthday(c.birthday)}
                     onPress={() => router.push(`/customers/${c.id}`)}
-                    right={<Chip label="Open" tone="primary" />}
+                    right={
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+                        {c.phone ? (
+                          <Chip
+                            label="Text"
+                            tone="success"
+                            icon="chatbox-ellipses"
+                            onPress={() => sendSms(`Happy birthday, ${c.name}! 🎉`, 'Birthday wishes', c.phone!)}
+                          />
+                        ) : null}
+                        <Chip label="Open" tone="primary" onPress={() => router.push(`/customers/${c.id}`)} />
+                      </View>
+                    }
                   />
                   {idx < Math.min(data.birthdays.length, 8) - 1 ? <Divider /> : null}
                 </View>
@@ -148,11 +174,19 @@ export default function MarketingScreen() {
                   subtitle={tpl.category ?? undefined}
                   onPress={() => setEditing(tpl)}
                   right={
-                    <Chip
-                      label="Share"
-                      tone="primary"
-                      onPress={() => shareBody(fillTemplate(tpl.body), tpl.title)}
-                    />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+                      <Chip
+                        label="SMS"
+                        tone="success"
+                        icon="chatbox-ellipses"
+                        onPress={() => sendSms(fillTemplate(tpl.body), tpl.title)}
+                      />
+                      <Chip
+                        label="Share"
+                        tone="primary"
+                        onPress={() => shareBody(fillTemplate(tpl.body), tpl.title)}
+                      />
+                    </View>
                   }
                 />
                 {idx < data.templates.length - 1 ? <Divider /> : null}

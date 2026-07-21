@@ -1,20 +1,22 @@
-import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { useAlert } from '@/components/confirm';
+import { LocationField, type LocationValue } from '@/components/location-field';
 import { Button, Card, IconButton, Screen, AppHeader, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listCustomers } from '@/db/repos/customers';
-import { listProducts } from '@/db/repos/products';
+import { findProductByBarcode, listProducts } from '@/db/repos/products';
 import { createSale, getSaleItems, updateSale } from '@/db/repos/sales';
 import type { Customer, PaymentMethod, Product, Sale } from '@/db/types';
 import { useTheme } from '@/hooks/use-theme';
 import { toUserMessage } from '@/lib/errors';
 import { fromMinor, parseMoney } from '@/lib/money';
+import { consumeScannedBarcode } from '@/lib/scan-bridge';
 
 interface LineItem {
   key: string;
@@ -48,6 +50,11 @@ export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => v
   const [method, setMethod] = useState<PaymentMethod>(initial?.payment_method ?? 'cash');
   const [customerId, setCustomerId] = useState<number | null>(initial?.customer_id ?? null);
   const [note, setNote] = useState(initial?.note ?? '');
+  const [location, setLocation] = useState<LocationValue>(
+    initial?.lat != null && initial?.lng != null
+      ? { lat: initial.lat, lng: initial.lng, label: initial.location_label ?? null }
+      : null,
+  );
   const [items, setItems] = useState<LineItem[]>([]);
   const [productModal, setProductModal] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -97,6 +104,29 @@ export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => v
 
   const removeItem = (key: string) => setItems((prev) => prev.filter((it) => it.key !== key));
 
+  const addScannedItem = useCallback(
+    async (code: string) => {
+      const p = await findProductByBarcode(code);
+      if (!p) {
+        void alert({ title: 'No match', message: `No ${terms.item.toLowerCase()} uses the code ${code}.` });
+        return;
+      }
+      setItems((prev) => [
+        ...prev,
+        { key: nextKey(), product_id: p.id, name: p.name, qty: '1', price: String(fromMinor(p.price)), unit_cost: p.cost },
+      ]);
+    },
+    [alert, terms],
+  );
+
+  // Pick up a code scanned on the /scan screen when we regain focus.
+  useFocusEffect(
+    useCallback(() => {
+      const code = consumeScannedBarcode();
+      if (code) void addScannedItem(code);
+    }, [addScannedItem]),
+  );
+
   const customerName = customers.find((c) => c.id === customerId)?.name ?? null;
 
   const save = async () => {
@@ -111,6 +141,9 @@ export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => v
         payment_method: method,
         customer_id: customerId,
         note: note.trim() || null,
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
+        location_label: location?.label ?? null,
         items: items.map((it) => ({
           product_id: it.product_id,
           name: it.name.trim() || 'Item',
@@ -177,7 +210,10 @@ export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => v
             </View>
           ))
         )}
-        <Button title="Add product" icon="add" variant="secondary" onPress={() => setProductModal(true)} />
+        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+          <Button title="Add product" icon="add" variant="secondary" onPress={() => setProductModal(true)} style={{ flex: 1 }} />
+          <Button title="Scan" icon="scan-outline" variant="secondary" onPress={() => router.push('/scan?mode=capture')} style={{ flex: 1 }} />
+        </View>
       </Card>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm }}>
@@ -200,6 +236,7 @@ export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => v
         <DateTimeField label="Date & time" value={occurredAt} onChange={setOccurredAt} />
         <SelectField label="Payment method" value={PAYMENT_METHODS.find((m) => m.value === method)?.label} onPress={() => setMethodModal(true)} />
         <SelectField label="Customer (optional)" value={customerName} placeholder="Walk-in / none" onPress={() => setCustomerModal(true)} />
+        <LocationField label="Location (optional)" value={location} onChange={setLocation} />
         <TextField label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything to remember" multiline />
       </Card>
 

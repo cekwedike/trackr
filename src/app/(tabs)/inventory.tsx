@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { SkeletonList } from '@/components/anim';
 import { useConfirm } from '@/components/confirm';
 import { MovableFab } from '@/components/nav';
-import { AppHeader, CardList, Chip, EmptyState, ListRow, Screen, Segmented } from '@/components/ui';
+import { AppHeader, CardList, Chip, EmptyState, IconButton, ListRow, Screen, Segmented } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
 import { listIngredients } from '@/db/repos/ingredients';
@@ -74,7 +74,10 @@ export default function Inventory() {
   return (
     <>
       <Screen>
-        <AppHeader title={terms.inventoryLabel} />
+        <AppHeader
+          title={terms.inventoryLabel}
+          right={<IconButton icon="scan-outline" tone="primary" onPress={() => router.push('/scan')} />}
+        />
         {tabs.length > 1 ? (
           <View style={{ marginBottom: Spacing.lg }}>
             <Segmented value={activeTab} onChange={setTab} options={tabs} />

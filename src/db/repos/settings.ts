@@ -33,6 +33,9 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
     'lock_enabled',
     'biometric_enabled',
     'onboarded',
+    'business_lat',
+    'business_lng',
+    'business_location_label',
   ];
   for (const key of allowed) {
     if (patch[key] !== undefined) {

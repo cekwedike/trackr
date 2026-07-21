@@ -6,6 +6,7 @@ import { Modal, Pressable, View } from 'react-native';
 
 import { FadeSlide } from '@/components/anim';
 import { alertAsync, confirmAsync, useAlert, useConfirm } from '@/components/confirm';
+import { LocationField, type LocationValue } from '@/components/location-field';
 import { PassphraseModal } from '@/components/passphrase-modal';
 import { AppHeader, Button, Card, Divider, ListRow, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { SelectField, SelectModal } from '@/components/pickers';
@@ -139,6 +140,7 @@ export default function Settings() {
   const alert = useAlert();
   const { settings, reloadSettings, industry, setIndustry } = useApp();
   const [name, setName] = useState('');
+  const [storeLocation, setStoreLocation] = useState<LocationValue>(null);
   const [currencyModal, setCurrencyModal] = useState(false);
   const [industryModal, setIndustryModal] = useState(false);
   const [pinModal, setPinModal] = useState(false);
@@ -159,7 +161,13 @@ export default function Settings() {
   const [notifCats, setNotifCats] = useState<Record<NotifCategory, boolean> | null>(null);
 
   useEffect(() => {
-    if (settings) setName(settings.business_name);
+    if (!settings) return;
+    setName(settings.business_name);
+    setStoreLocation(
+      settings.business_lat != null && settings.business_lng != null
+        ? { lat: settings.business_lat, lng: settings.business_lng, label: settings.business_location_label ?? null }
+        : null,
+    );
   }, [settings]);
 
   useEffect(() => {
@@ -203,6 +211,16 @@ export default function Settings() {
   const setCurrency = async (code: string) => {
     const c = findCurrency(code);
     await updateSettings({ currency_code: c.code, currency_symbol: c.symbol });
+    await reloadSettings();
+  };
+
+  const saveStoreLocation = async (value: LocationValue) => {
+    setStoreLocation(value);
+    await updateSettings({
+      business_lat: value?.lat ?? null,
+      business_lng: value?.lng ?? null,
+      business_location_label: value?.label ?? null,
+    });
     await reloadSettings();
   };
 
@@ -499,6 +517,7 @@ export default function Settings() {
           <TextField label="Business name" value={name} onChangeText={setName} right={<Pressable onPress={saveName}><Text variant="label" color={t.primary}>Save</Text></Pressable>} />
           <SelectField label="Industry / Dashboard" value={industry.name} onPress={() => setIndustryModal(true)} />
           <SelectField label="Currency" value={`${settings.currency_symbol} · ${settings.currency_code}`} onPress={() => setCurrencyModal(true)} />
+          <LocationField label="Store location" value={storeLocation} onChange={saveStoreLocation} />
         </Card>
       </FadeSlide>
 

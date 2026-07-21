@@ -16,6 +16,9 @@ export interface SaleInput {
   payment_method: PaymentMethod;
   customer_id: number | null;
   note?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  location_label?: string | null;
   items: SaleItemInput[];
 }
 
@@ -54,9 +57,20 @@ export async function createSale(input: SaleInput): Promise<number> {
   let saleId = 0;
   await db.withTransactionAsync(async () => {
     const res = await db.runAsync(
-      `INSERT INTO sales (occurred_at, payment_method, customer_id, total, cost_total, note, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [input.occurred_at, input.payment_method, input.customer_id, total, costTotal, input.note ?? null, now],
+      `INSERT INTO sales (occurred_at, payment_method, customer_id, total, cost_total, note, lat, lng, location_label, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.occurred_at,
+        input.payment_method,
+        input.customer_id,
+        total,
+        costTotal,
+        input.note ?? null,
+        input.lat ?? null,
+        input.lng ?? null,
+        input.location_label ?? null,
+        now,
+      ],
     );
     saleId = res.lastInsertRowId;
 
@@ -181,9 +195,20 @@ export async function updateSale(id: number, input: SaleInput): Promise<void> {
 
     await db.runAsync('DELETE FROM sale_items WHERE sale_id = ?', [id]);
     await db.runAsync(
-      `UPDATE sales SET occurred_at = ?, payment_method = ?, customer_id = ?, total = ?, cost_total = ?, note = ?
+      `UPDATE sales SET occurred_at = ?, payment_method = ?, customer_id = ?, total = ?, cost_total = ?, note = ?, lat = ?, lng = ?, location_label = ?
        WHERE id = ?`,
-      [input.occurred_at, input.payment_method, input.customer_id, total, costTotal, input.note ?? null, id],
+      [
+        input.occurred_at,
+        input.payment_method,
+        input.customer_id,
+        total,
+        costTotal,
+        input.note ?? null,
+        input.lat ?? null,
+        input.lng ?? null,
+        input.location_label ?? null,
+        id,
+      ],
     );
 
     for (const it of input.items) {

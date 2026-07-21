@@ -35,6 +35,7 @@ import {
 } from 'expo-audio';
 import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { Linking } from 'react-native';
 
 import * as Notifications from 'expo-notifications';
@@ -72,6 +73,11 @@ export const PermissionRationale = {
     title: 'Record voice notes',
     message:
       'Allow the microphone so you can capture voice notes. Audio is stored on your device and included only in backups you export.',
+  },
+  location: {
+    title: 'Tag with your location',
+    message:
+      'Allow location so Trackr can tag this record and fill in addresses. Trackr only reads your location when you tap to use it — never in the background. It stays on your device.',
   },
 } as const;
 
@@ -285,5 +291,52 @@ export function microphonePermissionMessage(outcome: PermissionOutcome): {
   return {
     title: PermissionRationale.microphone.title,
     message: PermissionRationale.microphone.message,
+  };
+}
+
+/** Current foreground-location permission without prompting. */
+export async function hasLocationPermission(): Promise<boolean> {
+  const { granted } = await Location.getForegroundPermissionsAsync();
+  return granted;
+}
+
+/**
+ * Prompt for foreground location access (JIT — call only when the user taps to
+ * tag/use a location). Foreground-only: never requests background location.
+ * Flow: check → in-app rationale (Continue) → OS `requestForegroundPermissionsAsync`.
+ * Returns `blocked` when the OS will not show the dialog again (open Settings).
+ */
+export async function requestLocation(options?: {
+  withRationale?: boolean;
+}): Promise<PermissionOutcome> {
+  const withRationale = options?.withRationale !== false;
+  const existing = await Location.getForegroundPermissionsAsync();
+  if (existing.granted) return 'granted';
+  if (!existing.canAskAgain && existing.status === Location.PermissionStatus.DENIED) {
+    return 'blocked';
+  }
+  if (withRationale) {
+    const ok = await confirmPermissionRationale('location');
+    if (!ok) return 'denied';
+  }
+  const result = await Location.requestForegroundPermissionsAsync();
+  if (result.granted) return 'granted';
+  return result.canAskAgain ? 'denied' : 'blocked';
+}
+
+export function locationPermissionMessage(outcome: PermissionOutcome): {
+  title: string;
+  message: string;
+} {
+  if (outcome === 'blocked') {
+    return {
+      title: 'Location access blocked',
+      message:
+        'Trackr can’t read your location. Enable Location for Trackr in system Settings, then try again.',
+    };
+  }
+  return {
+    title: PermissionRationale.location.title,
+    message: PermissionRationale.location.message,
   };
 }

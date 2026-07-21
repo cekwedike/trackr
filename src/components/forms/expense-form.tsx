@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 
 import { useAlert, useConfirm } from '@/components/confirm';
+import { LocationField, type LocationValue } from '@/components/location-field';
 import { useUndo } from '@/components/undo';
 import { Button, Card, Screen, AppHeader, TextField } from '@/components/ui';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
@@ -24,6 +25,11 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
   const [category, setCategory] = useState(initial?.category ?? '');
   const [payment, setPayment] = useState(initial?.payment_method ?? 'Cash');
   const [taxRate, setTaxRate] = useState(initial?.tax_rate ? String(initial.tax_rate) : '');
+  const [location, setLocation] = useState<LocationValue>(
+    initial?.lat != null && initial?.lng != null
+      ? { lat: initial.lat, lng: initial.lng, label: initial.location_label ?? null }
+      : null,
+  );
   const [date, setDate] = useState(initial ? new Date(initial.occurred_at) : new Date());
   const [catModal, setCatModal] = useState(false);
   const [payModal, setPayModal] = useState(false);
@@ -49,6 +55,9 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
         category: category || null,
         payment_method: payment,
         tax_rate: tax,
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
+        location_label: location?.label ?? null,
       };
       if (initial) await updateExpense(initial.id, payload);
       else await createExpense(payload);
@@ -86,6 +95,9 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
             category: snap.category,
             payment_method: snap.payment_method,
             tax_rate: snap.tax_rate,
+            lat: snap.lat,
+            lng: snap.lng,
+            location_label: snap.location_label,
           }),
       });
     }
@@ -107,6 +119,7 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
           placeholder="0"
         />
         <DateTimeField label="Date" value={date} onChange={setDate} mode="date" />
+        <LocationField label="Location (optional)" value={location} onChange={setLocation} />
       </Card>
 
       <Button title={initial ? 'Save changes' : 'Add expense'} icon="checkmark" onPress={save} loading={saving} size="lg" style={{ marginTop: Spacing.lg }} />
