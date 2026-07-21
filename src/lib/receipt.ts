@@ -1,10 +1,11 @@
+import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
 import { alertAsync } from '@/components/confirm';
 import type { Order, OrderItem, Sale, SaleItem } from '@/db/types';
 import { hexToRgba, shade } from '@/lib/color';
-import { formatDateTime } from '@/lib/date';
+import { dayjs, formatDateTime } from '@/lib/date';
 import { toUserMessage } from '@/lib/errors';
 import { formatMoney, formatQty } from '@/lib/money';
 
@@ -257,10 +258,37 @@ function friendlyError(action: string, error: unknown): void {
   void alertAsync({ title: `Couldn't ${action}`, message: toUserMessage(error) });
 }
 
+/** Collapse anything the OS filesystem dislikes into hyphens (no slashes, colons, etc.). */
+function safeFileName(value: string): string {
+  return value
+    .replace(/[/\\?%*:|"<>\u0000-\u001f]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * Human-friendly PDF name, e.g. `Trackr-invoice-0012-2026-07-21.pdf`.
+ * expo-print writes the PDF to a temp cache path with a random UUID name, so we
+ * copy it to this basename before sharing — most share sheets show the file's
+ * basename, so this is what the user sees when saving/emailing.
+ */
+function receiptFileName(data: ReceiptData): string {
+  const date = dayjs().format('YYYY-MM-DD');
+  return `${safeFileName(`Trackr-${data.kind}-${data.number}-${date}`)}.pdf`;
+}
+
 /** Generate a PDF and open the OS share sheet. Falls back gracefully if sharing is unavailable. */
 export async function shareReceipt(data: ReceiptData): Promise<void> {
   try {
     const { uri } = await Print.printToFileAsync({ html: buildReceiptHtml(data) });
+
+    // expo-print names the PDF with a random UUID; re-home it under a friendly
+    // basename so the share sheet / saved file shows a clear name, not a UUID.
+    const out = new File(Paths.cache, receiptFileName(data));
+    if (out.exists) out.delete();
+    new File(uri).move(out);
+
     const canShare = await Sharing.isAvailableAsync();
     if (!canShare) {
       void alertAsync({
@@ -269,7 +297,7 @@ export async function shareReceipt(data: ReceiptData): Promise<void> {
       });
       return;
     }
-    await Sharing.shareAsync(uri, {
+    await Sharing.shareAsync(out.uri, {
       mimeType: 'application/pdf',
       UTI: 'com.adobe.pdf',
       dialogTitle: data.kind === 'invoice' ? 'Send invoice' : 'Share receipt',
