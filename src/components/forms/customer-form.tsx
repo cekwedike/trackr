@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { useUndo } from '@/components/undo';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { DateTimeField } from '@/components/pickers';
@@ -27,6 +27,7 @@ import { fromMinor, parseMoney } from '@/lib/money';
 export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?: () => void }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { showUndo } = useUndo();
   const { currencySymbol, terms } = useApp();
   const [name, setName] = useState(initial?.name ?? '');
@@ -49,11 +50,19 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
       if (pick.status === 'cancelled') return;
       if (pick.status === 'denied') {
         const msg = contactsPermissionMessage(pick.outcome);
-        Alert.alert(msg.title, msg.message, [
-          pick.outcome === 'blocked'
-            ? { text: 'Open Settings', onPress: () => openSystemSettings() }
-            : { text: 'OK' },
-        ]);
+        if (pick.outcome === 'blocked') {
+          const choice = await confirm({
+            title: msg.title,
+            message: msg.message,
+            actions: [
+              { label: 'Open Settings', value: 'settings' },
+              { label: 'Cancel', style: 'cancel', value: 'cancel' },
+            ],
+          });
+          if (choice === 'settings') void openSystemSettings();
+        } else {
+          void alert({ title: msg.title, message: msg.message });
+        }
         return;
       }
       const c = pick.contact;
@@ -66,7 +75,7 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
         setBirthday(new Date(c.birthday));
       }
     } catch (e) {
-      Alert.alert('Couldn’t open contacts', toUserMessage(e));
+      void alert({ title: 'Couldn’t open contacts', message: toUserMessage(e) });
     } finally {
       setImportBusy(false);
     }
@@ -74,7 +83,7 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
 
   const save = async () => {
     if (!name.trim()) {
-      Alert.alert('Name required', `Please enter the ${terms.customer.toLowerCase()} name.`);
+      void alert({ title: 'Name required', message: `Please enter the ${terms.customer.toLowerCase()} name.` });
       return;
     }
     setSaving(true);
@@ -102,7 +111,7 @@ export function CustomerForm({ initial, onDone }: { initial?: Customer; onDone?:
       if (onDone) onDone();
       else router.back();
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this customer. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save this customer. Please try again.') });
     } finally {
       setSaving(false);
     }

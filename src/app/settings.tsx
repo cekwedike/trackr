@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, View } from 'react-native';
 
 import { FadeSlide } from '@/components/anim';
-import { useConfirm } from '@/components/confirm';
+import { alertAsync, confirmAsync, useAlert, useConfirm } from '@/components/confirm';
 import { PassphraseModal } from '@/components/passphrase-modal';
 import { AppHeader, Button, Card, Divider, ListRow, Screen, SectionHeader, Text, TextField, Toggle } from '@/components/ui';
 import { SelectField, SelectModal } from '@/components/pickers';
@@ -79,30 +79,37 @@ function timeLabel(hour: number, minute: number): string {
  */
 function alertNudgeScheduleFailure(outcome: PermissionOutcome, nudgeLabel: string): void {
   if (outcome === 'granted') {
-    Alert.alert(
-      'Couldn’t set reminder',
-      'Notifications are on, but we couldn’t schedule this reminder. Please try again.',
-      [{ text: 'OK' }],
-    );
+    void alertAsync({
+      title: 'Couldn’t set reminder',
+      message: 'Notifications are on, but we couldn’t schedule this reminder. Please try again.',
+    });
     return;
   }
   if (outcome === 'blocked') {
     const msg = notificationsPermissionMessage('blocked');
-    Alert.alert(msg.title, msg.message, [
-      { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
-      { text: 'OK', style: 'cancel' },
-    ]);
+    void confirmAsync({
+      title: msg.title,
+      message: msg.message,
+      actions: [
+        { label: 'Open Settings', value: 'settings' },
+        { label: 'Cancel', style: 'cancel', value: 'cancel' },
+      ],
+    }).then((choice) => {
+      if (choice === 'settings') void openAppPermissionSettings();
+    });
     return;
   }
-  Alert.alert('Notifications off', `Enable notifications for Trackr to get ${nudgeLabel} nudges.`, [
-    { text: 'OK' },
-  ]);
+  void alertAsync({
+    title: 'Notifications off',
+    message: `Enable notifications for Trackr to get ${nudgeLabel} nudges.`,
+  });
 }
 
 export default function Settings() {
   const t = useTheme();
   const router = useRouter();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { settings, reloadSettings, industry, setIndustry } = useApp();
   const [name, setName] = useState('');
   const [currencyModal, setCurrencyModal] = useState(false);
@@ -265,7 +272,7 @@ export default function Settings() {
   const toggleBiometric = async () => {
     // The row is disabled unless biometrics are available, but re-check to be safe.
     if (!biometricAvailable) {
-      Alert.alert('Not available', 'No fingerprint or face unlock is set up on this device.');
+      void alert({ title: 'Not available', message: 'No fingerprint or face unlock is set up on this device.' });
       return;
     }
     await updateSettings({ biometric_enabled: settings.biometric_enabled === 1 ? 0 : 1 });
@@ -364,7 +371,7 @@ export default function Settings() {
     try {
       await exportBackup(passphrase);
     } catch (e) {
-      Alert.alert('Export failed', toUserMessage(e, 'Couldn’t export your backup. Please try again.'));
+      void alert({ title: 'Export failed', message: toUserMessage(e, 'Couldn’t export your backup. Please try again.') });
     } finally {
       setBusy(false);
     }
@@ -414,10 +421,10 @@ export default function Settings() {
 
       await importLegacyBackup(picked.bytes, picked.kind);
       await reloadSettings();
-      Alert.alert('Restored', 'Your data has been restored.');
+      void alert({ title: 'Restored', message: 'Your data has been restored.' });
       setBusy(false);
     } catch (e) {
-      Alert.alert('Import failed', toUserMessage(e, 'Couldn’t restore that backup. Please try again.'));
+      void alert({ title: 'Import failed', message: toUserMessage(e, 'Couldn’t restore that backup. Please try again.') });
       setBusy(false);
     }
   };
@@ -435,9 +442,9 @@ export default function Settings() {
     try {
       await importBackupWithPassphrase(bytes, passphrase);
       await reloadSettings();
-      Alert.alert('Restored', 'Your data has been restored.');
+      void alert({ title: 'Restored', message: 'Your data has been restored.' });
     } catch (e) {
-      Alert.alert('Import failed', toUserMessage(e, 'Couldn’t restore that backup. Please try again.'));
+      void alert({ title: 'Import failed', message: toUserMessage(e, 'Couldn’t restore that backup. Please try again.') });
     } finally {
       setBusy(false);
     }

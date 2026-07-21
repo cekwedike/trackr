@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { SelectField, SelectModal } from '@/components/pickers';
 import { Spacing } from '@/constants/theme';
@@ -18,6 +18,7 @@ const UNITS = ['g', 'kg', 'ml', 'litre', 'pcs', 'pack', 'cup', 'tbsp', 'tsp', 'b
 export function IngredientForm({ initial }: { initial?: Ingredient }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { currencySymbol } = useApp();
 
   const [name, setName] = useState(initial?.name ?? '');
@@ -41,7 +42,7 @@ export function IngredientForm({ initial }: { initial?: Ingredient }) {
 
   const save = async () => {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter an ingredient name.');
+      void alert({ title: 'Name required', message: 'Please enter an ingredient name.' });
       return;
     }
     setSaving(true);
@@ -58,7 +59,7 @@ export function IngredientForm({ initial }: { initial?: Ingredient }) {
       else await createIngredient(payload);
       router.back();
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this ingredient. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save this ingredient. Please try again.') });
     } finally {
       setSaving(false);
     }

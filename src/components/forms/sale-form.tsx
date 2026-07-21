@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
+import { useAlert } from '@/components/confirm';
 import { Button, Card, IconButton, Screen, AppHeader, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
@@ -38,6 +39,7 @@ const nextKey = () => `item-${keyCounter++}`;
 
 export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => void }) {
   const t = useTheme();
+  const alert = useAlert();
   const { money, currencySymbol, terms } = useApp();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -99,7 +101,7 @@ export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => v
 
   const save = async () => {
     if (items.length === 0) {
-      Alert.alert('Add items', 'Add at least one item to record a sale.');
+      void alert({ title: 'Add items', message: 'Add at least one item to record a sale.' });
       return;
     }
     setSaving(true);
@@ -122,7 +124,7 @@ export function SaleForm({ initial, onDone }: { initial?: Sale; onDone?: () => v
       if (onDone) onDone();
       else router.back();
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this sale. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save this sale. Please try again.') });
     } finally {
       setSaving(false);
     }

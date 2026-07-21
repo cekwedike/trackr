@@ -1,14 +1,28 @@
 /**
  * Device contacts → Trackr customers (import + occasional re-sync).
- * Uses expo-contacts Contact API (SDK 57). Privacy: only import user-selected rows.
+ * Uses the expo-contacts class-based Contact API (SDK 57). Privacy: only import
+ * user-selected rows.
+ *
+ * API verified against the Expo SDK 57 docs + installed native types:
+ *  - https://docs.expo.dev/versions/v57.0.0/sdk/contacts/
+ *  - Contact.presentPicker() / Contact.getAllDetails(fields) / contact.getDetails(fields)
+ *  - ContactField.* enum (fullName, phones, emails, birthday, dates, …)
+ *
+ * Birthday is the one field that differs by platform: iOS exposes
+ * `ContactField.BIRTHDAY` directly, but Android has NO birthday field — the
+ * native `ContactField` enum only knows `DATES`, and birthdays arrive there as an
+ * event labelled "birthday". Requesting `ContactField.BIRTHDAY` on Android throws
+ * a native enum-conversion error, which is what broke both single and bulk import.
  */
-import { Contact, ContactField, type ContactDate } from 'expo-contacts';
+import { Contact, ContactField, type ContactDate, type ExistingDate } from 'expo-contacts';
 import { Linking, Platform } from 'react-native';
 
+import type { Customer } from '@/db/types';
 import {
   createCustomer,
   findCustomerByContactId,
   findCustomerByPhoneDigits,
+  listCustomers,
   updateCustomer,
   type CustomerInput,
 } from '@/db/repos/customers';
@@ -24,6 +38,32 @@ export interface ImportableContact {
   alreadyImported: boolean;
 }
 
+/** Fields we read for every imported contact, chosen per platform (see file header). */
+const DETAIL_FIELDS: ContactField[] = [
+  ContactField.FULL_NAME,
+  ContactField.GIVEN_NAME,
+  ContactField.FAMILY_NAME,
+  ContactField.PHONES,
+  ContactField.EMAILS,
+  Platform.OS === 'ios' ? ContactField.BIRTHDAY : ContactField.DATES,
+];
+
+/** Loose view over the fields we actually request from a contact's details. */
+interface ReadableContactDetails {
+  id: string;
+  fullName?: string | null;
+  givenName?: string | null;
+  familyName?: string | null;
+  phones?: { number?: string | null }[] | null;
+  emails?: { address?: string | null }[] | null;
+  birthday?: ContactDate | null;
+  dates?: ExistingDate[] | null;
+}
+
+function logContactsError(op: string, error: unknown): void {
+  if (__DEV__) console.warn(`[contacts-import] ${op} failed:`, error);
+}
+
 function birthdayToIso(bd: ContactDate | null | undefined): string | null {
   if (!bd || bd.month == null || bd.day == null) return null;
   // ContactDate.month is 1–12
@@ -33,6 +73,31 @@ function birthdayToIso(bd: ContactDate | null | undefined): string | null {
   const d = new Date(year, month - 1, day, 12, 0, 0);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
+}
+
+/**
+ * Resolve a birthday from contact details across platforms: iOS returns it on
+ * `birthday`; Android returns it inside `dates` as the event labelled "birthday".
+ */
+function birthdayFromDetails(det: ReadableContactDetails): string | null {
+  if (det.birthday) return birthdayToIso(det.birthday);
+  const birthday = (det.dates ?? []).find((d) => (d.label ?? '').toLowerCase() === 'birthday');
+  return birthday?.date ? birthdayToIso(birthday.date) : null;
+}
+
+/** Map raw contact details into the fields Trackr cares about (no DB access). */
+function mapDetails(det: ReadableContactDetails): Omit<ImportableContact, 'alreadyImported'> {
+  const name =
+    det.fullName?.trim() ||
+    [det.givenName, det.familyName].filter(Boolean).join(' ').trim() ||
+    'Unnamed contact';
+  return {
+    id: det.id,
+    name,
+    phone: det.phones?.[0]?.number ?? null,
+    email: det.emails?.[0]?.address ?? null,
+    birthday: birthdayFromDetails(det),
+  };
 }
 
 function digits(phone: string | null | undefined): string {
@@ -74,38 +139,33 @@ export async function openSystemSettings(): Promise<void> {
 
 /** Load contacts for a multi-select import UI. */
 export async function loadImportableContacts(): Promise<ImportableContact[]> {
-  const contacts = await Contact.getAll({});
-  const enriched: ImportableContact[] = [];
-
-  for (const c of contacts) {
-    const det = await c.getDetails([
-      ContactField.FULL_NAME,
-      ContactField.GIVEN_NAME,
-      ContactField.FAMILY_NAME,
-      ContactField.PHONES,
-      ContactField.EMAILS,
-      ContactField.BIRTHDAY,
-    ]);
-    const name =
-      det.fullName?.trim() ||
-      [det.givenName, det.familyName].filter(Boolean).join(' ').trim() ||
-      'Unnamed contact';
-    const phone = det.phones?.[0]?.number ?? null;
-    const email = det.emails?.[0]?.address ?? null;
-    const birthday = birthdayToIso(det.birthday ?? null);
-    const byId = await findCustomerByContactId(c.id);
-    const byPhone = !byId && phone ? await findCustomerByPhoneDigits(digits(phone)) : null;
-    enriched.push({
-      id: c.id,
-      name,
-      phone,
-      email,
-      birthday,
-      alreadyImported: !!(byId || byPhone),
-    });
+  // One optimized native call for all rows (avoids N+1 getDetails round-trips).
+  let details: ReadableContactDetails[];
+  try {
+    details = (await Contact.getAllDetails(DETAIL_FIELDS)) as unknown as ReadableContactDetails[];
+  } catch (e) {
+    logContactsError('getAllDetails', e);
+    throw e;
   }
 
-  return enriched.sort((a, b) => a.name.localeCompare(b.name));
+  // Load existing customers once and index them so dedupe is O(n), not a DB hit per row.
+  const existing = await listCustomers();
+  const byContactId = new Map<string, Customer>();
+  const byPhoneDigits = new Map<string, Customer>();
+  for (const c of existing) {
+    if (c.contact_id) byContactId.set(c.contact_id, c);
+    const d = digits(c.phone);
+    if (d) byPhoneDigits.set(d, c);
+  }
+
+  const rows: ImportableContact[] = details.map((det) => {
+    const mapped = mapDetails(det);
+    const alreadyImported =
+      byContactId.has(mapped.id) || (mapped.phone ? byPhoneDigits.has(digits(mapped.phone)) : false);
+    return { ...mapped, alreadyImported };
+  });
+
+  return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function toInput(c: ImportableContact): CustomerInput {
@@ -178,25 +238,16 @@ export async function importSelectedContacts(
 
 /** Map a native Contact into ImportableContact fields (no DB write). */
 async function detailsFromPicked(picked: Contact): Promise<ImportableContact> {
-  const det = await picked.getDetails([
-    ContactField.FULL_NAME,
-    ContactField.GIVEN_NAME,
-    ContactField.FAMILY_NAME,
-    ContactField.PHONES,
-    ContactField.EMAILS,
-    ContactField.BIRTHDAY,
-  ]);
-  return {
-    id: picked.id,
-    name:
-      det.fullName?.trim() ||
-      [det.givenName, det.familyName].filter(Boolean).join(' ').trim() ||
-      'Unnamed contact',
-    phone: det.phones?.[0]?.number ?? null,
-    email: det.emails?.[0]?.address ?? null,
-    birthday: birthdayToIso(det.birthday ?? null),
-    alreadyImported: !!(await findCustomerByContactId(picked.id)),
-  };
+  let det: ReadableContactDetails;
+  try {
+    det = (await picked.getDetails(DETAIL_FIELDS)) as unknown as ReadableContactDetails;
+  } catch (e) {
+    logContactsError('getDetails', e);
+    throw e;
+  }
+  const id = det.id ?? picked.id;
+  const mapped = mapDetails({ ...det, id });
+  return { ...mapped, alreadyImported: !!(await findCustomerByContactId(id)) };
 }
 
 export type PickContactResult =
@@ -212,7 +263,13 @@ export async function pickContactFields(): Promise<PickContactResult> {
   if (outcome !== 'granted') {
     return { status: 'denied', outcome };
   }
-  const picked = await Contact.presentPicker();
+  let picked: Contact | null;
+  try {
+    picked = await Contact.presentPicker();
+  } catch (e) {
+    logContactsError('presentPicker', e);
+    throw e;
+  }
   if (!picked) return { status: 'cancelled' };
   return { status: 'picked', contact: await detailsFromPicked(picked) };
 }

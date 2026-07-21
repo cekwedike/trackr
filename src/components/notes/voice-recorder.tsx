@@ -12,8 +12,9 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { useAlert, useConfirm } from '@/components/confirm';
 import { Text } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { addAttachment, deleteAttachment, listAttachments } from '@/db/repos/attachments';
@@ -69,6 +70,7 @@ function VoiceClip({
   onDeleted: () => void;
 }) {
   const t = useTheme();
+  const alert = useAlert();
   const player = useAudioPlayer(attachment.uri);
   const status = useAudioPlayerStatus(player);
   const playing = status.playing;
@@ -130,7 +132,7 @@ function VoiceClip({
             await deleteAttachment(attachment.id);
             onDeleted();
           } catch (e) {
-            Alert.alert('Couldn’t delete recording', toUserMessage(e));
+            void alert({ title: 'Couldn’t delete recording', message: toUserMessage(e) });
           }
         }}
         hitSlop={10}
@@ -144,6 +146,8 @@ function VoiceClip({
 
 export function VoiceNoteSection({ noteId }: { noteId: number }) {
   const t = useTheme();
+  const alert = useAlert();
+  const confirm = useConfirm();
   const recorder = useAudioRecorder(RECORD_OPTS);
   const recorderState = useAudioRecorderState(recorder, 100);
   const [clips, setClips] = useState<Attachment[]>([]);
@@ -188,10 +192,15 @@ export function VoiceNoteSection({ noteId }: { noteId: number }) {
       if (outcome !== 'granted') {
         if (outcome === 'blocked') {
           const msg = microphonePermissionMessage(outcome);
-          Alert.alert(msg.title, msg.message, [
-            { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
-            { text: 'OK', style: 'cancel' },
-          ]);
+          const choice = await confirm({
+            title: msg.title,
+            message: msg.message,
+            actions: [
+              { label: 'Open Settings', value: 'settings' },
+              { label: 'Cancel', style: 'cancel', value: 'cancel' },
+            ],
+          });
+          if (choice === 'settings') void openAppPermissionSettings();
         }
         // `denied` = rationale "Not now" or a one-time OS decline — no second nag.
         return;
@@ -201,7 +210,7 @@ export function VoiceNoteSection({ noteId }: { noteId: number }) {
       recorder.record();
       selectionFeedback();
     } catch (e) {
-      Alert.alert('Couldn’t start recording', toUserMessage(e));
+      void alert({ title: 'Couldn’t start recording', message: toUserMessage(e) });
     } finally {
       setBusy(false);
     }
@@ -215,7 +224,7 @@ export function VoiceNoteSection({ noteId }: { noteId: number }) {
       const uri = recorder.uri;
       const durationMs = recorderState.durationMillis ?? 0;
       if (!uri) {
-        Alert.alert('Recording failed', 'No audio was saved. Please try again.');
+        void alert({ title: 'Recording failed', message: 'No audio was saved. Please try again.' });
         return;
       }
       const persisted = await persistAudioRecording(uri, 'audio/mp4');
@@ -224,7 +233,7 @@ export function VoiceNoteSection({ noteId }: { noteId: number }) {
       selectionFeedback();
       await reload();
     } catch (e) {
-      Alert.alert('Couldn’t save recording', toUserMessage(e));
+      void alert({ title: 'Couldn’t save recording', message: toUserMessage(e) });
     } finally {
       setBusy(false);
     }

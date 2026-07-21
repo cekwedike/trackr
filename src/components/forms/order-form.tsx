@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { useUndo } from '@/components/undo';
 import { Button, Card, IconButton, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
@@ -31,6 +31,7 @@ const nextKey = () => `o-${counter++}`;
 export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () => void }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { showUndo } = useUndo();
   const { money, currencySymbol, terms } = useApp();
 
@@ -69,7 +70,7 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
 
   const save = async () => {
     if (rows.length === 0) {
-      Alert.alert('Add items', 'Add at least one item to the order.');
+      void alert({ title: 'Add items', message: 'Add at least one item to the order.' });
       return;
     }
     setSaving(true);
@@ -88,7 +89,7 @@ export function OrderForm({ initial, onDone }: { initial?: Order; onDone?: () =>
       if (onDone) onDone();
       else router.back();
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this order. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save this order. Please try again.') });
     } finally {
       setSaving(false);
     }

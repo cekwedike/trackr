@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -13,6 +13,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Duration, Ease } from '@/constants/motion';
 
 import { Aurora, FadeSlide } from '@/components/anim';
+import { useConfirm } from '@/components/confirm';
 import { AnimatedGrid } from '@/components/nav';
 import { Brand, Button, Card, Text, TextField, Toggle } from '@/components/ui';
 import { CURRENCIES } from '@/constants/currencies';
@@ -39,6 +40,7 @@ export default function Onboarding() {
   const { width } = useWindowDimensions();
   const hPad = width >= 480 ? Spacing.xl : Spacing.lg;
   const { reloadSettings, unlock } = useApp();
+  const confirm = useConfirm();
   const [step, setStep] = useState(0);
 
   const [name, setName] = useState('');
@@ -61,10 +63,15 @@ export default function Onboarding() {
       setNotifOutcome(outcome);
       if (outcome === 'blocked') {
         const msg = notificationsPermissionMessage(outcome);
-        Alert.alert(msg.title, msg.message, [
-          { text: 'Open Settings', onPress: () => void openAppPermissionSettings() },
-          { text: 'OK', style: 'cancel' },
-        ]);
+        const choice = await confirm({
+          title: msg.title,
+          message: msg.message,
+          actions: [
+            { label: 'Open Settings', value: 'settings' },
+            { label: 'Cancel', style: 'cancel', value: 'cancel' },
+          ],
+        });
+        if (choice === 'settings') void openAppPermissionSettings();
       }
     } finally {
       setRequestingNotif(false);

@@ -18,8 +18,9 @@
  */
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 
+import { confirmAsync } from '@/components/confirm';
 import {
   cameraPermissionMessage,
   confirmPermissionRationale,
@@ -112,10 +113,15 @@ export async function pickAttachmentImage(): Promise<PickedAttachment | null> {
   if (result.canceled || !result.assets?.length) {
     if (!permission.granted && !permission.canAskAgain) {
       const msg = photosPermissionMessage('blocked');
-      Alert.alert(msg.title, msg.message, [
-        { text: 'Open Settings', onPress: () => Linking.openSettings().catch(() => {}) },
-        { text: 'OK', style: 'cancel' },
-      ]);
+      const choice = await confirmAsync({
+        title: msg.title,
+        message: msg.message,
+        actions: [
+          { label: 'Open Settings', value: 'settings' },
+          { label: 'OK', style: 'cancel', value: 'cancel' },
+        ],
+      });
+      if (choice === 'settings') Linking.openSettings().catch(() => {});
     }
     return null;
   }
@@ -134,10 +140,15 @@ export async function captureAttachmentImage(): Promise<PickedAttachment | null>
   if (outcome !== 'granted') {
     if (outcome === 'blocked') {
       const msg = cameraPermissionMessage('blocked');
-      Alert.alert(msg.title, msg.message, [
-        { text: 'Open Settings', onPress: () => Linking.openSettings().catch(() => {}) },
-        { text: 'OK', style: 'cancel' },
-      ]);
+      const choice = await confirmAsync({
+        title: msg.title,
+        message: msg.message,
+        actions: [
+          { label: 'Open Settings', value: 'settings' },
+          { label: 'OK', style: 'cancel', value: 'cancel' },
+        ],
+      });
+      if (choice === 'settings') Linking.openSettings().catch(() => {});
     }
     return null;
   }
@@ -153,15 +164,18 @@ export async function captureAttachmentImage(): Promise<PickedAttachment | null>
 
 type ImageSourceChoice = 'camera' | 'library' | 'cancel';
 
-/** Present Take photo / Choose from library / Cancel. */
-function chooseImageSource(): Promise<ImageSourceChoice> {
-  return new Promise((resolve) => {
-    Alert.alert('Add photo', 'Take a new picture or choose one you already have.', [
-      { text: 'Take photo', onPress: () => resolve('camera') },
-      { text: 'Choose from library', onPress: () => resolve('library') },
-      { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
-    ]);
+/** Present a branded Take photo / Choose from library / Cancel chooser. */
+async function chooseImageSource(): Promise<ImageSourceChoice> {
+  const choice = await confirmAsync<ImageSourceChoice>({
+    title: 'Add photo',
+    message: 'Take a new picture or choose one you already have.',
+    actions: [
+      { label: 'Take photo', value: 'camera' },
+      { label: 'Choose from library', value: 'library' },
+      { label: 'Cancel', style: 'cancel', value: 'cancel' },
+    ],
   });
+  return choice ?? 'cancel';
 }
 
 /**

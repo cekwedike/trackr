@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { HelpTip } from '@/components/help';
 import { PassphraseModal } from '@/components/passphrase-modal';
 import { AppHeader, Button, Card, Screen, SectionHeader, Text, type IconName } from '@/components/ui';
@@ -55,6 +55,7 @@ function summarize(c: DemoCounts): string {
 export default function DataScreen() {
   const t = useTheme();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { reloadSettings } = useApp();
   const [busy, setBusy] = useState<string | null>(null);
   const [exportPassModal, setExportPassModal] = useState(false);
@@ -68,7 +69,7 @@ export default function DataScreen() {
     try {
       await fn();
     } catch (e) {
-      Alert.alert('Something went wrong', toUserMessage(e));
+      void alert({ title: 'Something went wrong', message: toUserMessage(e) });
     } finally {
       setBusy(null);
     }
@@ -128,10 +129,10 @@ export default function DataScreen() {
 
       const result = await importLegacyBackup(picked.bytes, picked.kind);
       await reloadSettings();
-      Alert.alert('Restore complete', `Your data was restored from the backup (${result.tables} tables).`);
+      void alert({ title: 'Restore complete', message: `Your data was restored from the backup (${result.tables} tables).` });
       setBusy(null);
     } catch (e) {
-      Alert.alert('Something went wrong', toUserMessage(e));
+      void alert({ title: 'Something went wrong', message: toUserMessage(e) });
       setBusy(null);
     }
   };
@@ -149,9 +150,9 @@ export default function DataScreen() {
     try {
       const result = await importBackupWithPassphrase(bytes, passphrase);
       await reloadSettings();
-      Alert.alert('Restore complete', `Your data was restored from the backup (${result.tables} tables).`);
+      void alert({ title: 'Restore complete', message: `Your data was restored from the backup (${result.tables} tables).` });
     } catch (e) {
-      Alert.alert('Something went wrong', toUserMessage(e));
+      void alert({ title: 'Something went wrong', message: toUserMessage(e) });
     } finally {
       setBusy(null);
     }
@@ -161,14 +162,14 @@ export default function DataScreen() {
     run(`csv-${action.key}`, async () => {
       const result = await action.run();
       if (result.count === 0) {
-        Alert.alert('Nothing to export', `There are no ${action.label.toLowerCase()} to export yet.`);
+        void alert({ title: 'Nothing to export', message: `There are no ${action.label.toLowerCase()} to export yet.` });
       }
     });
 
   const onLoadDemo = () =>
     run('demo-load', async () => {
       const counts = await loadDemoData();
-      Alert.alert('Sample data added', `Added ${summarize(counts)}. Explore the app, then clear it any time.`);
+      void alert({ title: 'Sample data added', message: `Added ${summarize(counts)}. Explore the app, then clear it any time.` });
     });
 
   const onClearDemo = async () => {
@@ -183,7 +184,7 @@ export default function DataScreen() {
     if (choice !== 'ok') return;
     run('demo-clear', async () => {
       const counts = await clearDemoData();
-      Alert.alert('Sample data removed', `Removed ${summarize(counts)}.`);
+      void alert({ title: 'Sample data removed', message: `Removed ${summarize(counts)}.` });
     });
   };
 

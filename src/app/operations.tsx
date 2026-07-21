@@ -3,10 +3,10 @@
  */
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { FadeSlide } from '@/components/anim';
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import {
   AppHeader,
   Button,
@@ -43,6 +43,7 @@ export default function OperationsScreen() {
   const t = useTheme();
   const { money, terms } = useApp();
   const confirm = useConfirm();
+  const alert = useAlert();
   const [busyId, setBusyId] = useState<number | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
 
@@ -87,10 +88,10 @@ export default function OperationsScreen() {
     try {
       const res = await fn();
       if (res.count === 0) {
-        Alert.alert('Nothing to export', 'Add a few records first, then export again.');
+        void alert({ title: 'Nothing to export', message: 'Add a few records first, then export again.' });
       }
     } catch (e) {
-      Alert.alert('Export failed', toUserMessage(e, 'Couldn’t export. Please try again.'));
+      void alert({ title: 'Export failed', message: toUserMessage(e, 'Couldn’t export. Please try again.') });
     } finally {
       setExporting(null);
     }

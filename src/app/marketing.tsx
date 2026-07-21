@@ -4,10 +4,10 @@
  */
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Share, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
 
 import { FadeSlide } from '@/components/anim';
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { SelectField, SelectModal } from '@/components/pickers';
 import {
   AppHeader,
@@ -53,6 +53,7 @@ import { toUserMessage } from '@/lib/errors';
 export default function MarketingScreen() {
   const t = useTheme();
   const { terms } = useApp();
+  const alert = useAlert();
   const [editing, setEditing] = useState<MessageTemplate | null | 'new'>(null);
   const [ideaText, setIdeaText] = useState('');
   const [editingIdeaId, setEditingIdeaId] = useState<number | null>(null);
@@ -78,7 +79,7 @@ export default function MarketingScreen() {
     try {
       await Share.share({ message: body, title });
     } catch (e) {
-      Alert.alert('Couldn’t share', toUserMessage(e, 'Try again in a moment.'));
+      void alert({ title: 'Couldn’t share', message: toUserMessage(e, 'Try again in a moment.') });
     }
   };
 
@@ -202,10 +203,10 @@ export default function MarketingScreen() {
                         setEditingIdeaTitle('');
                         reload();
                       } catch (e) {
-                        Alert.alert(
-                          'Couldn’t save',
-                          toUserMessage(e, 'Couldn’t save this idea. Please try again.'),
-                        );
+                        void alert({
+                          title: 'Couldn’t save',
+                          message: toUserMessage(e, 'Couldn’t save this idea. Please try again.'),
+                        });
                       } finally {
                         setSavingIdeaId(null);
                       }
@@ -260,10 +261,10 @@ export default function MarketingScreen() {
                 setIdeaText('');
                 reload();
               } catch (e) {
-                Alert.alert(
-                  'Couldn’t save',
-                  toUserMessage(e, 'Couldn’t add this idea. Please try again.'),
-                );
+                void alert({
+                  title: 'Couldn’t save',
+                  message: toUserMessage(e, 'Couldn’t add this idea. Please try again.'),
+                });
               } finally {
                 setAddingIdea(false);
               }
@@ -314,6 +315,7 @@ function TemplateEditor({
 }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const alert = useAlert();
   const [title, setTitle] = useState(initial?.title ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
   const [category, setCategory] = useState(initial?.category ?? 'Promo');
@@ -322,11 +324,11 @@ function TemplateEditor({
 
   const save = async () => {
     if (!title.trim()) {
-      Alert.alert('Add a title', 'Give this template a short name.');
+      void alert({ title: 'Add a title', message: 'Give this template a short name.' });
       return;
     }
     if (!body.trim()) {
-      Alert.alert('Add a message', 'Write the text you’ll share.');
+      void alert({ title: 'Add a message', message: 'Write the text you’ll share.' });
       return;
     }
     setSaving(true);

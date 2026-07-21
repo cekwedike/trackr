@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { useUndo } from '@/components/undo';
 import { Button, Card, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
@@ -22,6 +22,7 @@ const UNITS = ['pcs', 'pack', 'box', 'kg', 'g', 'litre', 'ml', 'plate', 'bottle'
 export function ProductForm({ initial }: { initial?: Product }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { showUndo } = useUndo();
   const { currencySymbol, money } = useApp();
 
@@ -54,7 +55,7 @@ export function ProductForm({ initial }: { initial?: Product }) {
 
   const save = async () => {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter a product name.');
+      void alert({ title: 'Name required', message: 'Please enter a product name.' });
       return;
     }
     setSaving(true);
@@ -74,7 +75,7 @@ export function ProductForm({ initial }: { initial?: Product }) {
       else await createProduct(payload);
       router.back();
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this product. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save this product. Please try again.') });
     } finally {
       setSaving(false);
     }

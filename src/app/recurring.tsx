@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { HelpTip } from '@/components/help';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
 import {
@@ -159,6 +159,7 @@ function RuleForm({
   onSaved: () => void;
 }) {
   const { currencySymbol } = useApp();
+  const alert = useAlert();
   const [amount, setAmount] = useState(initial ? String(fromMinor(initial.amount)) : '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [category, setCategory] = useState(initial?.category ?? '');
@@ -173,7 +174,7 @@ function RuleForm({
   const save = async () => {
     const minor = parseMoney(amount);
     if (minor <= 0) {
-      Alert.alert('Enter amount', 'Please enter a valid expense amount.');
+      void alert({ title: 'Enter amount', message: 'Please enter a valid expense amount.' });
       return;
     }
     setSaving(true);

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { BackHandler, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, BackHandler, Modal, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui';
@@ -24,7 +24,56 @@ export interface ConfirmOptions<V = string> {
 
 type ConfirmFn = <V = string>(options: ConfirmOptions<V>) => Promise<V | undefined>;
 
+export interface AlertOptions {
+  title: string;
+  message?: string;
+  okLabel?: string;
+}
+
 const ConfirmContext = createContext<ConfirmFn | null>(null);
+
+/**
+ * The most recently mounted provider's confirm function, exposed so plain
+ * (non-React) modules — e.g. `lib/attachments`, `lib/permissions` — can present
+ * the branded dialog instead of the grey native `Alert.alert`. It is registered
+ * by {@link ConfirmProvider} while mounted.
+ */
+let registeredConfirm: ConfirmFn | null = null;
+
+/** Native dialog fallback used only if no ConfirmProvider is mounted yet. */
+function nativeFallback<V>(options: ConfirmOptions<V>): Promise<V | undefined> {
+  return new Promise<V | undefined>((resolve) => {
+    const cancel = options.actions.find((a) => a.style === 'cancel');
+    Alert.alert(
+      options.title,
+      options.message,
+      options.actions.map((a) => ({
+        text: a.label,
+        style: a.style === 'destructive' ? 'destructive' : a.style === 'cancel' ? 'cancel' : 'default',
+        onPress: () => resolve(a.value),
+      })),
+      { cancelable: true, onDismiss: () => resolve(cancel ? cancel.value : undefined) },
+    );
+  });
+}
+
+/**
+ * Imperative branded confirm usable anywhere (including outside React). Prefer
+ * {@link useConfirm} inside components; use this from libs/utilities.
+ */
+export function confirmAsync<V = string>(options: ConfirmOptions<V>): Promise<V | undefined> {
+  if (registeredConfirm) return registeredConfirm(options);
+  return nativeFallback(options);
+}
+
+/** Imperative branded single-button alert (replacement for `Alert.alert`). */
+export function alertAsync(options: AlertOptions): Promise<void> {
+  return confirmAsync({
+    title: options.title,
+    message: options.message,
+    actions: [{ label: options.okLabel ?? 'OK', style: 'default', value: 'ok' }],
+  }).then(() => undefined);
+}
 
 /**
  * Mount once near the app root. Exposes an imperative, themed replacement for
@@ -57,6 +106,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  // Expose this provider's confirm to the imperative API (for non-React callers).
+  useEffect(() => {
+    registeredConfirm = confirm;
+    return () => {
+      if (registeredConfirm === confirm) registeredConfirm = null;
+    };
+  }, [confirm]);
+
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
@@ -69,6 +126,20 @@ export function useConfirm(): ConfirmFn {
   const ctx = useContext(ConfirmContext);
   if (!ctx) throw new Error('useConfirm must be used within a ConfirmProvider');
   return ctx;
+}
+
+/** Branded single-button alert hook (replacement for `Alert.alert`). */
+export function useAlert(): (options: AlertOptions) => Promise<void> {
+  const confirm = useConfirm();
+  return useCallback(
+    (options: AlertOptions) =>
+      confirm({
+        title: options.title,
+        message: options.message,
+        actions: [{ label: options.okLabel ?? 'OK', style: 'default', value: 'ok' }],
+      }).then(() => undefined),
+    [confirm],
+  );
 }
 
 function ConfirmDialog({

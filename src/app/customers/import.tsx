@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { useAlert, useConfirm } from '@/components/confirm';
 import { AppHeader, Button, Card, EmptyState, Screen, Text, TextField } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useApp } from '@/context/app-context';
@@ -21,6 +22,8 @@ import { selectionFeedback } from '@/lib/haptics';
 
 export default function ImportContactsScreen() {
   const t = useTheme();
+  const alert = useAlert();
+  const confirm = useConfirm();
   const { terms } = useApp();
   const { mode: modeParam } = useLocalSearchParams<{ mode?: string }>();
   const mode = modeParam === 'resync' ? 'resync' : 'import';
@@ -42,10 +45,15 @@ export default function ImportContactsScreen() {
         setContacts([]);
         if (outcome === 'blocked') {
           const msg = contactsPermissionMessage(outcome);
-          Alert.alert(msg.title, msg.message, [
-            { text: 'Open Settings', onPress: () => openSystemSettings() },
-            { text: 'OK', style: 'cancel' },
-          ]);
+          const choice = await confirm({
+            title: msg.title,
+            message: msg.message,
+            actions: [
+              { label: 'Open Settings', value: 'settings' },
+              { label: 'Cancel', style: 'cancel', value: 'cancel' },
+            ],
+          });
+          if (choice === 'settings') void openSystemSettings();
         }
         return;
       }
@@ -57,11 +65,11 @@ export default function ImportContactsScreen() {
         setSelected(new Set());
       }
     } catch (e) {
-      Alert.alert('Couldn’t load contacts', toUserMessage(e));
+      void alert({ title: 'Couldn’t load contacts', message: toUserMessage(e) });
     } finally {
       setLoading(false);
     }
-  }, [mode]);
+  }, [mode, alert, confirm]);
 
   useEffect(() => {
     load();
@@ -108,13 +116,13 @@ export default function ImportContactsScreen() {
       if (result.created) parts.push(`${result.created} added`);
       if (result.updated) parts.push(`${result.updated} updated`);
       if (result.skipped) parts.push(`${result.skipped} skipped`);
-      Alert.alert(
-        mode === 'resync' ? 'Re-sync complete' : 'Import complete',
-        parts.length ? parts.join(' · ') : 'Nothing changed.',
-      );
+      await alert({
+        title: mode === 'resync' ? 'Re-sync complete' : 'Import complete',
+        message: parts.length ? parts.join(' · ') : 'Nothing changed.',
+      });
       router.back();
     } catch (e) {
-      Alert.alert('Import failed', toUserMessage(e));
+      void alert({ title: 'Import failed', message: toUserMessage(e) });
     } finally {
       setBusy(false);
     }

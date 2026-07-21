@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
+import { useAlert } from '@/components/confirm';
 import { Button, Card, AppHeader, Screen, Text, TextField } from '@/components/ui';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
 import { Spacing } from '@/constants/theme';
@@ -20,6 +20,7 @@ const RECURRENCE: { value: Recurrence; label: string }[] = [
 
 export function ReminderForm({ initial, onDone }: { initial?: Reminder; onDone?: () => void }) {
   const t = useTheme();
+  const alert = useAlert();
   const [title, setTitle] = useState(initial?.title ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
   const [due, setDue] = useState(() => (initial ? new Date(initial.due_at) : new Date(Date.now() + 60 * 60 * 1000)));
@@ -34,7 +35,7 @@ export function ReminderForm({ initial, onDone }: { initial?: Reminder; onDone?:
 
   const save = async () => {
     if (!title.trim()) {
-      Alert.alert('Title required', 'Please enter a reminder title.');
+      void alert({ title: 'Title required', message: 'Please enter a reminder title.' });
       return;
     }
     setSaving(true);
@@ -80,11 +81,11 @@ export function ReminderForm({ initial, onDone }: { initial?: Reminder; onDone?:
       }
 
       if (!scheduledId && shouldNotify && pastOnce) {
-        Alert.alert('Saved', 'Reminder saved, but the time is in the past so no notification was scheduled.');
+        void alert({ title: 'Saved', message: 'Reminder saved, but the time is in the past so no notification was scheduled.' });
       }
       finish();
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this reminder. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save this reminder. Please try again.') });
     } finally {
       setSaving(false);
     }

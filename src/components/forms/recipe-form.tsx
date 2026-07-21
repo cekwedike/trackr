@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { useUndo } from '@/components/undo';
 import { Button, Card, IconButton, AppHeader, Screen, SectionHeader, Text, TextField } from '@/components/ui';
 import { HelpTip } from '@/components/help';
@@ -30,6 +30,7 @@ const nextKey = () => `r-${counter++}`;
 export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () => void }) {
   const t = useTheme();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { showUndo } = useUndo();
   const { money } = useApp();
 
@@ -75,7 +76,7 @@ export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () 
 
   const save = async () => {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter a recipe name.');
+      void alert({ title: 'Name required', message: 'Please enter a recipe name.' });
       return;
     }
     setSaving(true);
@@ -92,7 +93,7 @@ export function RecipeForm({ initial, onDone }: { initial?: Recipe; onDone?: () 
       if (onDone) onDone();
       else router.back();
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this recipe. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save this recipe. Please try again.') });
     } finally {
       setSaving(false);
     }

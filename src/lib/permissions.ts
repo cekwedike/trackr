@@ -33,9 +33,11 @@ import {
 } from 'expo-audio';
 import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 
 import * as Notifications from 'expo-notifications';
+
+import { confirmAsync } from '@/components/confirm';
 
 import {
   getNotificationPermissionState,
@@ -82,12 +84,14 @@ function mapContactsStatus(status: Contacts.PermissionStatus): PermissionOutcome
 /** Show in-app rationale, then resolve true only if the user chooses to continue. */
 export function confirmPermissionRationale(kind: PermissionKind): Promise<boolean> {
   const r = PermissionRationale[kind];
-  return new Promise((resolve) => {
-    Alert.alert(r.title, r.message, [
-      { text: 'Not now', style: 'cancel', onPress: () => resolve(false) },
-      { text: 'Continue', onPress: () => resolve(true) },
-    ]);
-  });
+  return confirmAsync({
+    title: r.title,
+    message: r.message,
+    actions: [
+      { label: 'Continue', value: 'continue' },
+      { label: 'Not now', style: 'cancel', value: 'cancel' },
+    ],
+  }).then((v) => v === 'continue');
 }
 
 /**

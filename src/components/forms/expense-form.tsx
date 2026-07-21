@@ -1,8 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { useUndo } from '@/components/undo';
 import { Button, Card, Screen, AppHeader, TextField } from '@/components/ui';
 import { DateTimeField, SelectField, SelectModal } from '@/components/pickers';
@@ -18,6 +17,7 @@ const PAYMENT = ['Cash', 'Transfer', 'POS', 'Card', 'Other'];
 export function ExpenseForm({ initial }: { initial?: Expense }) {
   const { currencySymbol } = useApp();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { showUndo } = useUndo();
   const [amount, setAmount] = useState(initial ? String(fromMinor(initial.amount)) : '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -32,12 +32,12 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
   const save = async () => {
     const minor = parseMoney(amount);
     if (minor <= 0) {
-      Alert.alert('Enter amount', 'Please enter a valid expense amount.');
+      void alert({ title: 'Enter amount', message: 'Please enter a valid expense amount.' });
       return;
     }
     const tax = parseFloat(taxRate.replace(',', '.')) || 0;
     if (tax < 0 || tax > 100) {
-      Alert.alert('Check tax rate', 'Tax / VAT should be between 0 and 100%.');
+      void alert({ title: 'Check tax rate', message: 'Tax / VAT should be between 0 and 100%.' });
       return;
     }
     setSaving(true);
@@ -54,7 +54,7 @@ export function ExpenseForm({ initial }: { initial?: Expense }) {
       else await createExpense(payload);
       router.back();
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save this expense. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save this expense. Please try again.') });
     } finally {
       setSaving(false);
     }

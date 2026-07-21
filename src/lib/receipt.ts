@@ -1,7 +1,7 @@
-import { Alert } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
+import { alertAsync } from '@/components/confirm';
 import type { Order, OrderItem, Sale, SaleItem } from '@/db/types';
 import { hexToRgba, shade } from '@/lib/color';
 import { formatDateTime } from '@/lib/date';
@@ -254,7 +254,7 @@ function totalRow(label: string, value: string, color: string, strong = false): 
 }
 
 function friendlyError(action: string, error: unknown): void {
-  Alert.alert(`Couldn't ${action}`, toUserMessage(error));
+  void alertAsync({ title: `Couldn't ${action}`, message: toUserMessage(error) });
 }
 
 /** Generate a PDF and open the OS share sheet. Falls back gracefully if sharing is unavailable. */
@@ -263,10 +263,10 @@ export async function shareReceipt(data: ReceiptData): Promise<void> {
     const { uri } = await Print.printToFileAsync({ html: buildReceiptHtml(data) });
     const canShare = await Sharing.isAvailableAsync();
     if (!canShare) {
-      Alert.alert(
-        'Sharing unavailable',
-        `Sharing isn't available on this device. The ${data.kind} was saved as a PDF instead.`,
-      );
+      void alertAsync({
+        title: 'Sharing unavailable',
+        message: `Sharing isn't available on this device. The ${data.kind} was saved as a PDF instead.`,
+      });
       return;
     }
     await Sharing.shareAsync(uri, {

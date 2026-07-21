@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { AllocationDonut, DONUT_COLORS, FadeSlide, Stagger } from '@/components/anim';
-import { useConfirm } from '@/components/confirm';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { HelpTip } from '@/components/help';
 import {
   AppHeader,
@@ -61,6 +61,7 @@ function toDraft(buckets: { name: string; percent: number }[]): DraftBucket[] {
 export default function ProfitScreen() {
   const t = useTheme();
   const confirm = useConfirm();
+  const alert = useAlert();
   const { settings, money, reloadSettings, industry, accent } = useApp();
   const [monthKey, setMonthKey] = useState<string>(currentMonthKey());
   const [editing, setEditing] = useState(false);
@@ -143,12 +144,12 @@ export default function ProfitScreen() {
     const prevKey = shiftMonthKey(monthKey, -1);
     const prev = await getProfitRecord(prevKey);
     if (!prev) {
-      Alert.alert('Nothing to copy', `No recorded split for ${formatMonthKey(prevKey)} yet.`);
+      void alert({ title: 'Nothing to copy', message: `No recorded split for ${formatMonthKey(prevKey)} yet.` });
       return;
     }
     const slices = parseAllocationSlices(prev.allocation);
     if (slices.length === 0) {
-      Alert.alert('Nothing to copy', `${formatMonthKey(prevKey)} has no allocation buckets.`);
+      void alert({ title: 'Nothing to copy', message: `${formatMonthKey(prevKey)} has no allocation buckets.` });
       return;
     }
     setDraft(slices.map((s) => ({ name: s.name, percent: String(s.percent) })));
@@ -168,13 +169,13 @@ export default function ProfitScreen() {
       return;
     }
     if (!balanced) {
-      Alert.alert('Allocation must total 100%', `Your buckets currently add up to ${round1(total)}%.`);
+      void alert({ title: 'Allocation must total 100%', message: `Your buckets currently add up to ${round1(total)}%.` });
       return;
     }
     try {
       await saveSplitTemplate(toBuckets(draft));
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t save your profit split. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t save your profit split. Please try again.') });
       return;
     }
     setEditing(false);
@@ -182,11 +183,11 @@ export default function ProfitScreen() {
 
   const recordMonth = async () => {
     if (!balanced) {
-      Alert.alert('Allocation must total 100%', `Your buckets currently add up to ${round1(total)}%.`);
+      void alert({ title: 'Allocation must total 100%', message: `Your buckets currently add up to ${round1(total)}%.` });
       return;
     }
     if (record?.locked === 1) {
-      Alert.alert('Month locked', 'Unlock this month before updating the recorded close.');
+      void alert({ title: 'Month locked', message: 'Unlock this month before updating the recorded close.' });
       return;
     }
     const cleanBuckets = toBuckets(draft);
@@ -201,7 +202,7 @@ export default function ProfitScreen() {
         allocation: JSON.stringify(slices),
       });
     } catch (e) {
-      Alert.alert('Couldn’t save', toUserMessage(e, 'Couldn’t record this month. Please try again.'));
+      void alert({ title: 'Couldn’t save', message: toUserMessage(e, 'Couldn’t record this month. Please try again.') });
       return;
     }
     // Only the current month updates the global starting template for future months.
@@ -214,12 +215,12 @@ export default function ProfitScreen() {
     seedRef.current = ''; // force reseed from the freshly saved snapshot
     await reload();
     setEditing(false);
-    Alert.alert('Recorded', `${formatMonthKey(monthKey)} saved to your profit history.`);
+    void alert({ title: 'Recorded', message: `${formatMonthKey(monthKey)} saved to your profit history.` });
   };
 
   const toggleLock = async () => {
     if (!record) {
-      Alert.alert('Record first', 'Save this month’s profit snapshot before locking it.');
+      void alert({ title: 'Record first', message: 'Save this month’s profit snapshot before locking it.' });
       return;
     }
     const next = record.locked !== 1;

@@ -14,7 +14,6 @@
     },
     "android": {
       "package": "ltd.siryus.trackr",
-      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#2563EB",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

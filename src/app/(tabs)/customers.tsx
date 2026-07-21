@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { SkeletonList } from '@/components/anim';
+import { useAlert, useConfirm } from '@/components/confirm';
 import { MovableFab } from '@/components/nav';
 import { AppHeader, Button, CardList, Chip, EmptyState, ListRow, Screen, TextField } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -20,6 +21,8 @@ import { toUserMessage } from '@/lib/errors';
 
 export default function CustomersScreen() {
   const { money, terms } = useApp();
+  const alert = useAlert();
+  const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const { data, reload } = useAsyncData(() => listCustomers(), []);
   const { actions: fabActions, defaultKeys } = useQuickActionCandidates(['customer', 'order', 'sale', 'note']);
@@ -40,21 +43,29 @@ export default function CustomersScreen() {
       if (pick.status === 'cancelled') return;
       if (pick.status === 'denied') {
         const msg = contactsPermissionMessage(pick.outcome);
-        Alert.alert(msg.title, msg.message, [
-          pick.outcome === 'blocked'
-            ? { text: 'Open Settings', onPress: () => openSystemSettings() }
-            : { text: 'OK' },
-        ]);
+        if (pick.outcome === 'blocked') {
+          const choice = await confirm({
+            title: msg.title,
+            message: msg.message,
+            actions: [
+              { label: 'Open Settings', value: 'settings' },
+              { label: 'Cancel', style: 'cancel', value: 'cancel' },
+            ],
+          });
+          if (choice === 'settings') void openSystemSettings();
+        } else {
+          void alert({ title: msg.title, message: msg.message });
+        }
         return;
       }
       const result = await importSelectedContacts([pick.contact], 'import');
       await reload();
-      Alert.alert(
-        result.created ? 'Contact added' : 'Contact updated',
-        `${terms.customer} list refreshed from your address book.`,
-      );
+      void alert({
+        title: result.created ? 'Contact added' : 'Contact updated',
+        message: `${terms.customer} list refreshed from your address book.`,
+      });
     } catch (e) {
-      Alert.alert('Couldn’t import contact', toUserMessage(e));
+      void alert({ title: 'Couldn’t import contact', message: toUserMessage(e) });
     } finally {
       setImportBusy(false);
     }
