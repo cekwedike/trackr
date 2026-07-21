@@ -138,8 +138,15 @@ export async function scheduleReminder(
         break;
       case 'none':
       default: {
-        if (due.getTime() <= Date.now()) return null;
-        trigger = { type: Notifications.SchedulableTriggerInputTypes.DATE, date: due, channelId };
+        // Fire exactly on the chosen minute. The time picker only sets hour +
+        // minute and leaves seconds/ms at whatever the form's initial Date
+        // carried (derived from `Date.now()`), which would otherwise push the
+        // alert up to ~59s past the intended minute. Zero them so a "1:45"
+        // reminder is scheduled for 1:45:00.
+        const fireAt = new Date(due);
+        fireAt.setSeconds(0, 0);
+        if (fireAt.getTime() <= Date.now()) return null;
+        trigger = { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt, channelId };
         break;
       }
     }
